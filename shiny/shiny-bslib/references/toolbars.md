@@ -142,13 +142,12 @@ update_toolbar_input_button(
 
 Update button appearance or state from the server. Pass only the parameters you want to change; `NULL` leaves them unchanged.
 
-**Example — disable while processing:**
+**Example — conditionally disable based on reactive state:**
 ```r
-observeEvent(input$run, {
-  update_toolbar_input_button("run", disabled = TRUE)
-  result <- do_analysis()
-  output$result <- renderTable(result)
-  update_toolbar_input_button("run", disabled = FALSE)
+observe({
+  update_toolbar_input_button("export",
+    disabled = nrow(filtered_data()) == 0
+  )
 })
 ```
 
