@@ -198,44 +198,6 @@ card(
 )
 ```
 
-### Navset Card with Shared Controls
-
-Use `card_header()` via the `header` argument to share controls across all tabs:
-
-```r
-navset_card_underline(
-  header = card_header(
-    "Analysis",
-    toolbar(
-      toolbar_input_select("metric", "Metric",
-        choices = c("Revenue", "Units", "Margin")
-      )
-    )
-  ),
-  full_screen = TRUE,
-  nav_panel("By Region", plotOutput("region_plot")),
-  nav_panel("By Product", plotOutput("product_plot"))
-)
-```
-
-### Sidebar with a Reset Button
-
-Place a toolbar directly inside the sidebar when you want a compact action button alongside the sidebar's controls:
-
-```r
-sidebar(
-  title = "Filters",
-  toolbar(
-    align = "right",
-    toolbar_input_button("reset", "Reset filters",
-      icon = bsicons::bs_icon("arrow-counterclockwise")
-    )
-  ),
-  selectInput("species", "Species",
-    choices = c("Adelie", "Chinstrap", "Gentoo")
-  )
-)
-```
 
 ## Info Icon Labels
 
