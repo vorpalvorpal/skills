@@ -125,7 +125,7 @@ See [theming.md](references/theming.md) for detailed guidance.
 - **Tooltips** -- Hover-triggered help text
 - **Popovers** -- Click-triggered containers for secondary UI/inputs
 - **Toasts** -- Temporary notification messages
-- **Toolbars** -- Compact horizontal strips of buttons, selects, and dividers for card headers and nav bars
+- **Toolbars** -- Compact horizontal strips of buttons, selects, and dividers for card headers and footers
 
 See [accordions.md](references/accordions.md), [tooltips-popovers.md](references/tooltips-popovers.md), [toasts.md](references/toasts.md), and [toolbars.md](references/toolbars.md).
 
@@ -228,6 +228,6 @@ See [migration.md](references/migration.md) for a complete mapping of legacy pat
 - **[accordions.md](references/accordions.md)** -- Collapsible sections and sidebar organization
 - **[tooltips-popovers.md](references/tooltips-popovers.md)** -- Hover tooltips and click-triggered popovers
 - **[toasts.md](references/toasts.md)** -- Temporary notification messages
-- **[toolbars.md](references/toolbars.md)** -- Toolbar components for card headers and nav bars
+- **[toolbars.md](references/toolbars.md)** -- Toolbar components for card headers and footers
 - **[inputs.md](references/inputs.md)** -- Special bslib input widgets
 - **[best-practices.md](references/best-practices.md)** -- bslib-specific patterns and common gotchas

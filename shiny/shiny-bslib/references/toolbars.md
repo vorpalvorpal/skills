@@ -1,6 +1,6 @@
 # Toolbars in bslib
 
-Toolbars are compact horizontal strips of controls — buttons, selects, and dividers — designed to sit in card headers, sidebar headers, or navigation bars without taking up full-width space. They are distinct from full-width control strips: toolbar inputs are visually compact and integrate with the card's header styling.
+Toolbars are compact horizontal strips of controls — buttons, selects, and dividers — designed for card headers and footers. Toolbar inputs are visually compact and integrate with the card's header/footer styling, unlike full-width sidebar controls.
 
 ## Table of Contents
 
@@ -142,7 +142,19 @@ update_toolbar_input_button(
 
 Update button appearance or state from the server. Pass only the parameters you want to change; `NULL` leaves them unchanged.
 
-**Example — conditionally disable based on reactive state:**
+**Example — toggle icon on click:**
+```r
+chart_type <- reactiveVal("bar")
+observeEvent(input$toggle_type, {
+  new_type <- if (chart_type() == "bar") "line" else "bar"
+  chart_type(new_type)
+  update_toolbar_input_button("toggle_type",
+    icon = bsicons::bs_icon(if (new_type == "bar") "bar-chart" else "graph-up")
+  )
+})
+```
+
+**Example — conditionally disable:**
 ```r
 observe({
   update_toolbar_input_button("export",
@@ -177,26 +189,6 @@ observeEvent(input$region, {
 ```
 
 ## Placement Patterns
-
-### Card Header (most common)
-
-```r
-card(
-  card_header(
-    "Monthly Revenue",
-    toolbar(
-      toolbar_input_select("currency", "Currency",
-        choices = c("USD", "EUR", "GBP")
-      ),
-      toolbar_input_button("export", "Export",
-        icon = bsicons::bs_icon("box-arrow-up")
-      )
-    )
-  ),
-  plotOutput("revenue_plot")
-)
-```
-
 
 ### Card Footer
 
@@ -242,5 +234,3 @@ selectInput(
 ```
 
 This works with any Shiny input that takes an HTML `label` argument. The `title` on `bs_icon()` provides accessible text for screen readers — see the main skill's Icons section for accessibility guidance on icon-only triggers.
-
-For a simpler single-icon trigger without a full toolbar, use `tooltip()` or `popover()` directly in `card_header()` instead (see [best-practices.md](best-practices.md)).
