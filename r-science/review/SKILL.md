@@ -6,6 +6,7 @@ description: >
   judgement before merge. Reviews plan-conformance and scientific soundness,
   and delegates general code- and test-quality review to the existing
   reviewer skills.
+disable-model-invocation: true
 ---
 
 # Reviewing a scientific change against its plan

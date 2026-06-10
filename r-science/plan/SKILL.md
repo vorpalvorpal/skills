@@ -6,6 +6,7 @@ description: >
   code is written. Produces a correctness-first plan that specifies behaviour
   precisely enough — equations, invariants, references, edge cases — for the
   tests skill to derive the describe()/it() specs from it.
+disable-model-invocation: true
 ---
 
 # Creating an implementation plan

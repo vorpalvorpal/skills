@@ -6,6 +6,7 @@ description: >
   baselines, turning the plan's pending behaviour specs green, and deferring
   behaviour-changing optimisations for the user. Use when implementing a
   non-trivial change that already has a plan and tests.
+disable-model-invocation: true
 ---
 
 # Implementing a non-trivial change
@@ -23,9 +24,10 @@ same.
 - There must be an **approved plan** (`plan` skill) with ordered stages and,
   per function, the behaviours and their correctness basis.
 - There must be a **behaviour spec** in `tests/testthat/` (`tests` skill) — the
-  pending `it("...")` specs are your checklist. If they don't exist yet, run
-  the `tests` skill first.
-- If either is missing, stop and produce it before coding.
+  pending `it("...")` specs are your checklist.
+- `plan` and `tests` are explicit commands (`/plan`, `/tests`); you cannot
+  invoke them yourself. If either artefact is missing, **stop and tell the user
+  to run `/plan` and/or `/tests` first**, then resume.
 
 ## 1. Verify git state
 
@@ -136,7 +138,9 @@ doubling down.
 
 When all stages are committed and green:
 
-1. Hand off to the **`review`** skill for a full review against the plan.
+1. Tell the user to run **`/review`** for a full review against the plan
+   (it's an explicit command you can't invoke yourself), and fold its findings
+   into the report below.
 2. **Report to the user:**
    - Divergences from the plan (list them), or confirmation it matches.
    - Test status: which behaviours are covered; any still pending.

@@ -6,6 +6,7 @@ description: >
   and how to speed something up. Optimisations that preserve behaviour are fair
   game; anything that changes results is deferred to the user as a modelling
   decision.
+disable-model-invocation: true
 ---
 
 # Benchmarking and optimising scientific R code

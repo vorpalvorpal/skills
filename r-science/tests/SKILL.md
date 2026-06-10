@@ -5,6 +5,7 @@ description: >
   specification for a scientific R package — describe()/it() tests that are
   the plan made verbose. Use after a plan is approved and before (or
   alongside) implementation, when converting planned behaviour into tests.
+disable-model-invocation: true
 ---
 
 # Turning a plan into a behaviour specification
