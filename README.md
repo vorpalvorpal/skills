@@ -10,6 +10,8 @@ Claude Skills extend Claude's capabilities with specialized knowledge and workfl
 
 A workflow spine and supporting knowledge skills for **science-centered** R package development — where mathematical, statistical, physical, and biological correctness comes first and the code is functional by default. The skills chain together: **plan → tests → implement → verify → benchmark/optimise → review**.
 
+> **One-command setup:** the `r-science` plugin bundles **every skill in this repo** — the spine below plus all the R-lib, posit-dev, GitHub, open-source, Quarto, Shiny, and ggsql skills — so `/plugin install r-science@rjs-skills` installs the complete toolkit. Install the individual plugins below only if you want a narrower set.
+
 - **[conventions](./r-science/conventions/)** - Coding conventions for scientific R packages (correctness-first, functional by default, reproducible, referenced); ships a `CLAUDE.md` template for dropping into a package root
 - **[plan](./r-science/plan/)** - Correctness-first implementation planning that specifies behaviour and its correctness basis (equations, invariants, references, edge cases) precisely enough for tests to be derived from it
 - **[tests](./r-science/tests/)** - Turn an approved plan into an executable behaviour specification — describe/it tests with analytic/invariant/reference/round-trip oracles and seeded stochastic tests
