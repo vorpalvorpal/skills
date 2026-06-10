@@ -50,6 +50,12 @@ jobs:
         run: |
           git checkout main
           if git merge --no-edit upstream/main; then
+            # Keep the r-science bundle complete: append any newly added skills.
+            python3 .github/scripts/update-bundle.py
+            if ! git diff --quiet; then
+              git add .claude-plugin/marketplace.json
+              git commit -m "chore: add new upstream skills to the r-science bundle"
+            fi
             git push origin main
             echo "Auto-merged ${{ steps.check.outputs.behind }} upstream commit(s) into main."
           else

@@ -46,7 +46,8 @@
         "./brand-yml",
         "./shiny/shiny-bslib",
         "./shiny/shiny-bslib-theming",
-        "./ggsql/ggsql"
+        "./ggsql/ggsql",
+        "./open-source/maintainer-decline"
       ]
     },
     {
