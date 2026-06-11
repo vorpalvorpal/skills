@@ -71,19 +71,24 @@ examples, seed locally (`withr::local_seed()`).
 
 ## Data
 
-- **Tabular CSV data ships in Frictionless Data form** — a `datapackage.json`
+Choose the format by **shape and size**:
+
+- **Small tabular** → **CSV in Frictionless Data form** — a `datapackage.json`
   (Table Schema) describing each CSV's fields, types, constraints, units, and
-  source. This makes the data self-describing and validatable, and pins down
-  the provenance of any reference/known-answer dataset. (See the `frictionless`
-  skill.)
-- **Store large or complex data, not as CSV**, by size and shape:
-  - **`qs2`** (`qs2::qs_save()` / `qs_read()`) for large R objects — fast,
-    compressed serialisation of model fits, arrays, lists, etc.
-  - **DuckDB** (a `.duckdb` database) for large or relational tabular data, or
-    when you need out-of-core queries rather than loading everything into
-    memory.
-  Choose by size and complexity: small flat table → Frictionless CSV; big R
-  object → `qs2`; big/relational/queried → DuckDB.
+  source. Self-describing, validatable, and it pins down the provenance of any
+  reference/known-answer dataset. (See the `frictionless` skill.)
+- **Large tabular** (too big for CSV, no relational/query complexity) →
+  **Parquet** — columnar, compressed, language-agnostic, schema-bearing, read
+  directly by arrow and DuckDB. Frictionless can describe and validate Parquet
+  too, so provenance carries over.
+- **Large or relational tabular**, or needing out-of-core queries → **DuckDB**
+  (a `.duckdb` database).
+- **Large non-tabular R objects** (model fits, arrays, lists) → **`qs2`**
+  (`qs2::qs_save()` / `qs2::qs_read()`) — fast, compressed serialisation.
+
+A Frictionless Table Schema can *document* a `qs2` object as metadata, but the
+Frictionless tooling can't *validate* a `qs2` blob (it parses CSV/Parquet) — so
+for anything that needs schema validation, prefer CSV or Parquet.
 
 ## Documentation
 

@@ -36,6 +36,10 @@ opening comment of the GitHub issue).
 Still hold a sceptical line: if making the brief concrete exposes a flaw in the
 direction itself, don't push through — see "Return to the whiteboard" below.
 
+**If a later phase sent you back here**, you're *revising* an existing plan
+(and its tests/benchmarks already exist) — amend what's wrong, keep what still
+holds, and note what changed; don't rewrite from scratch.
+
 ## 2. Anchor to GitHub and gather context
 
 Only once the whiteboard is settled:

@@ -12,9 +12,9 @@ write feature code.
 
 | Agent | Role | Edits? | Model |
 |-------|------|--------|-------|
-| `implementer` | Codes one stage to green; house style + status protocol baked in | yes | sonnet |
+| `implementer` | Codes one stage to green; house style + status protocol baked in | yes | per task (haiku→opus) |
 | `reviewer` | Final review: plan conformance + scientific soundness, then delegates code/test quality | no | opus |
-| `benchmarker` | Profiling/benchmark dig; returns the conclusion | no | sonnet |
+| `benchmarker` | Runs predefined benchmarks, reports raw numbers (no ROI call) | no | haiku |
 | `plan-reviewer` | Reviews a draft plan for testability before tests are written | no | opus |
 
 Because the `implementer` bakes in the conventions and the status protocol, the
@@ -34,6 +34,11 @@ instead.)
      escalate to the user.
 3. **Independently verify** — do not trust the report. Read the diff yourself
    and run the stage's specs (the `verify` skill's evidence rule applies).
+4. **Route deficiencies by kind** (implement §3d): *minor* (typos, namespacing,
+   simple bug, missing docs) → a fresh narrow-scope subagent ("fix exactly X"),
+   keep the draft; *major* (wrong implementation) → discard the draft, fix the
+   prompt, re-dispatch to a more capable model. On a failed attempt, bump one
+   tier and retry once, then escalate to the user.
 
 ## Two-stage review — correctness before quality
 
@@ -44,12 +49,15 @@ quality) to `critical-code-reviewer` / `review-testing`. When the reviewer
 returns findings, the **same `implementer`** fixes them and resubmits for
 re-review. Repeat until Approve — skipping the re-review defeats the gate.
 
-## Open question for revision
+## Open questions (wait-and-see)
 
-The `review` skill is `disable-model-invocation: true`, which blocks it from
-preloading into a subagent — so the `reviewer` agent **embeds** its checklist
-rather than loading the `review` skill. Decide whether to keep both (`/review`
-for manual use, `reviewer` agent for orchestrated use) or converge on one.
-Similarly, confirm how this plugin exposes `agents/` once installed via the
-marketplace (skills are listed in `marketplace.json`; agent discovery needs
-verifying).
+- The `reviewer` agent currently **embeds** its checklist rather than loading
+  the `review` skill (the skill is `disable-model-invocation`, which blocks
+  subagent preloading). This works; leave it. *If* the duplication starts to
+  bite, the fix is to flip `review` to `disable-model-invocation: false` and
+  add "DO NOT CALL THIS YOURSELF unless asked" to its description — but note
+  that re-enables auto-activation, and `review` carries `model: opus`, so a
+  stray activation could shift a turn's model. Not worth pre-solving until it's
+  a real problem.
+- Confirm how this plugin exposes `agents/` once installed via the marketplace
+  (skills are listed in `marketplace.json`; agent discovery needs verifying).

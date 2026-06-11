@@ -26,6 +26,11 @@ choice likely to cause significant performance issues.
   and a reference to the original source where applicable.
 - Set/accept a seed for any stochastic code so behaviour is reproducible.
 
+## Data
+- By shape and size: small tabular → CSV in Frictionless Data form; large
+  tabular → Parquet; relational/queried → DuckDB; large non-tabular R objects →
+  `qs2`.
+
 ## Tooling
 - Tests: testthat 3e, under `tests/testthat/`.
 - Benchmarks: the `bench` package, under `bench/` (outside `R CMD check`).

@@ -107,6 +107,10 @@ Before finishing:
 - **Issue already exists** → ask whether to **replace** its initial comment or
   **add** the brief as a new comment.
 
+If you were sent back here from `/plan`, you're **revising** an existing brief
+(and there may already be a plan/tests downstream) — update the direction and
+say what changed, rather than starting from a blank slate.
+
 ## Next step
 
 > Design brief ready. Run `/plan` to turn it into an implementation plan?
