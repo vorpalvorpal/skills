@@ -6,6 +6,7 @@ description: >
   baselines, turning the plan's pending behaviour specs green, and deferring
   behaviour-changing optimisations for the user. Use when implementing a
   non-trivial change that already has a plan and tests.
+disable-model-invocation: true
 ---
 
 # Implementing a non-trivial change
@@ -23,9 +24,10 @@ same.
 - There must be an **approved plan** (`plan` skill) with ordered stages and,
   per function, the behaviours and their correctness basis.
 - There must be a **behaviour spec** in `tests/testthat/` (`tests` skill) — the
-  pending `it("...")` specs are your checklist. If they don't exist yet, run
-  the `tests` skill first.
-- If either is missing, stop and produce it before coding.
+  pending `it("...")` specs are your checklist.
+- `plan` and `tests` are explicit commands (`/plan`, `/tests`); you cannot
+  invoke them yourself. If either artefact is missing, **stop and tell the user
+  to run `/plan` and/or `/tests` first**, then resume.
 
 ## 1. Verify git state
 
@@ -86,8 +88,8 @@ prompt must include. Key points:
 - Require functional-by-default code, roxygen2 on new exported functions, and
   in-code comments justifying scientific/statistical choices with references —
   this **overrides** any generic "don't add comments/docs" subagent default.
-- Scope is locked to the stage's files; behaviour-changing optimisations are
-  forbidden (they get deferred — see 3f).
+- Scope is locked to the stage's files. **Behaviour-changing optimisations are
+  forbidden in-stage — NEVER apply one silently.** They get deferred (see 3f).
 
 ### 3d. Review the subagent's work
 
@@ -136,7 +138,9 @@ doubling down.
 
 When all stages are committed and green:
 
-1. Hand off to the **`review`** skill for a full review against the plan.
+1. Tell the user to run **`/review`** for a full review against the plan
+   (it's an explicit command you can't invoke yourself), and fold its findings
+   into the report below.
 2. **Report to the user:**
    - Divergences from the plan (list them), or confirmation it matches.
    - Test status: which behaviours are covered; any still pending.
@@ -155,8 +159,17 @@ When all stages are committed and green:
 1. Delegate the coding; never hand-write feature code yourself.
 2. Read relevant files before writing a subagent prompt — give accurate
    context, not "find the file".
-3. Correctness review is yours and is non-negotiable; don't rubber-stamp
-   subagent output.
+3. **Correctness review is yours and is non-negotiable. NEVER rubber-stamp
+   subagent output** — read the diff and check the science yourself, every
+   stage. A delegated change you didn't verify is a change you don't understand.
 4. Commit per stage, not all at the end. Stage specific files.
 5. Never force-push; never amend — new commits for fixes.
 6. Keep the plan file and tracking doc updated as you go.
+
+## Next step
+
+After the final report, surface the next command rather than assuming it:
+
+> Implementation complete (all specs green). Run `/benchmark-optimise` to work
+> through the deferred-optimisations list and performance, then `/review` for
+> the final pass?

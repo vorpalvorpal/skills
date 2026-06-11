@@ -6,6 +6,7 @@ description: >
   code is written. Produces a correctness-first plan that specifies behaviour
   precisely enough — equations, invariants, references, edge cases — for the
   tests skill to derive the describe()/it() specs from it.
+disable-model-invocation: true
 ---
 
 # Creating an implementation plan
@@ -16,22 +17,22 @@ second, and the API exists to serve the science. The plan you produce is the
 single source of truth that the **tests**, **implement**, and **review**
 skills all consume. Write it for a less capable model than yourself.
 
-## 1. Whiteboard first — challenge the request
+## 1. Start from the design brief — converge
 
-Do this BEFORE looking at any existing issues, so stale or prior ideas don't
-pollute the lateral-thinking stage. Decide whether what you've been asked to
-do is the *correct* thing to do:
+Planning is the *convergent* counterpart to `/whiteboard`'s divergence. Ideally
+you start from a design brief (the `/whiteboard` skill's output, usually the
+opening comment of the GitHub issue).
 
-- Understand the underlying scientific and practical motivation.
-- Consider alternative, better ways to reach the same goal.
-- Consider whether the motivation itself has inherent problems — a flawed
-  model, a statistic that doesn't mean what the user thinks, a quantity that
-  isn't identifiable from the data.
-- Ask clarifying questions as needed.
-- **Push back if you have any concerns at all**, scientific or otherwise.
+- **If a design brief exists**, take its chosen direction as the basis and make
+  it concrete. The "is this the right thing to do?" question was settled at the
+  whiteboard; your job now is "how do we do it correctly?"
+- **If there's no brief and the change is non-trivial or exploratory**, suggest
+  running `/whiteboard` first — don't silently invent the direction yourself.
+- A brief may still carry **open questions**; resolve the ones that block the
+  plan, with the user.
 
-Do not move past the whiteboard until both you and the user agree this is the
-correct thing to do.
+Still hold a sceptical line: if making the brief concrete exposes a flaw in the
+direction itself, don't push through — see "Return to the whiteboard" below.
 
 ## 2. Anchor to GitHub and gather context
 
@@ -154,5 +155,14 @@ skills read.
 ## Return to the whiteboard
 
 If major issues surface while drafting or editing the plan — especially a
-scientific one — go back to the whiteboard rather than doubling down on an
-incorrect approach.
+scientific one, or any sign the *direction itself* is wrong — **stop and
+suggest running `/whiteboard` again** rather than doubling down on an incorrect
+approach. Planning going off the rails is the signal to diverge again, not to
+force a plan.
+
+## Next step
+
+When the plan is recorded and you're both satisfied, surface the next command
+so the user doesn't have to recall it — ask whether to proceed:
+
+> Plan recorded. Run `/tests` to turn it into the behaviour spec?

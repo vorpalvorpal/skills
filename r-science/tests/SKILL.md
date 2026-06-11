@@ -5,6 +5,7 @@ description: >
   specification for a scientific R package — describe()/it() tests that are
   the plan made verbose. Use after a plan is approved and before (or
   alongside) implementation, when converting planned behaviour into tests.
+disable-model-invocation: true
 ---
 
 # Turning a plan into a behaviour specification
@@ -93,9 +94,9 @@ expected values is your job, not the plan's:
 
 ## 4. Reproducibility and edge cases
 
-- **Seed every stochastic test.** Use `withr::local_seed()` (or
-  `set.seed()`); never rely on ambient RNG state. A flaky scientific test is
-  worse than no test.
+- **Seed every stochastic test. No exceptions.** Use `withr::local_seed()`
+  (or `set.seed()`); never rely on ambient RNG state. An unseeded test that
+  flakes is worse than no test — every time.
 - Give each edge case from the plan its own `it()`: `NA`/`NaN`/`Inf`, empty /
   zero-length input, degenerate cases (singular matrices, zero variance,
   n = 1), and boundary values. Assert the *documented* behaviour (propagate
@@ -123,5 +124,13 @@ devtools::test()
   you have found a pre-existing bug — surface it to the user rather than
   silently adjusting the test.
 
-Hand the suite to the **implement** skill: the pending specs are the
-behaviour checklist it implements and turns green, stage by stage.
+The pending specs are the behaviour checklist the implement step turns green,
+stage by stage.
+
+## Next step
+
+Once the behaviour spec is written and failing for the right reasons, offer the
+next command:
+
+> Behaviour spec ready (N pending specs). Run `/implement` to start turning
+> them green?

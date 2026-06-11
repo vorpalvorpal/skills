@@ -6,6 +6,7 @@ description: >
   and how to speed something up. Optimisations that preserve behaviour are fair
   game; anything that changes results is deferred to the user as a modelling
   decision.
+disable-model-invocation: true
 ---
 
 # Benchmarking and optimising scientific R code
@@ -108,3 +109,10 @@ skill captures a baseline before each stage and re-benchmarks after. Use this
 skill to write those benchmarks, to investigate any bottleneck implement
 surfaces, and to evaluate the deferred-optimisations list with the user once
 the behaviour is correct and committed.
+
+## Next step
+
+When benchmarking and optimisation are done, offer the next command:
+
+> Performance work complete. Run `/review` for the final review against the
+> plan?
