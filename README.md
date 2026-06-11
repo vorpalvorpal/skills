@@ -24,6 +24,7 @@ A workflow spine and supporting knowledge skills for **science-centered** R pack
 - **[review-testing](./posit-dev/review-testing/)** - General test-quality review (also in posit-dev); `review` delegates test-quality findings to it
 - **[r-oop](./r-science/r-oop/)** - Decide whether a problem needs OOP at all, then pick the right system (S7 preferred, then S3; vctrs for vector-like types)
 - **[r-bayes](./r-science/r-bayes/)** - Bayesian modelling with brms/Stan: DAG-based identification, justified priors, convergence as a hard gate, seeded reproducible fits
+- **[frictionless](./r-science/frictionless/)** - Author, validate, and document tabular data as Frictionless Data Packages in R (CSV/Parquet + Table Schema), including provenance for reference/known-answer datasets
 
 ### Posit Developer
 

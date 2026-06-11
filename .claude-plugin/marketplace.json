@@ -48,7 +48,8 @@
         "./shiny/shiny-bslib-theming",
         "./ggsql/ggsql",
         "./open-source/maintainer-decline",
-        "./r-science/whiteboard"
+        "./r-science/whiteboard",
+        "./r-science/frictionless"
       ]
     },
     {
