@@ -29,8 +29,7 @@ from it without guessing. You never edit; you return findings and a verdict.
   expected behaviour.
 - **Error conditions** name their intended classed condition.
 - **Scientific basis cited** for the methods (papers/standard procedures).
-- **Backwards-compatibility stated** explicitly (and not added unless the user
-  asked).
+- **Backwards-compatibility requirements** are stated explicitly.
 - **Stages ordered**, with independence/sequencing marked for the orchestrator.
 - **Reproducibility**: stochastic steps take/set a seed.
 
