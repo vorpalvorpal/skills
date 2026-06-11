@@ -87,9 +87,17 @@ examples, seed locally (`withr::local_seed()`).
 
 ## Documentation
 
-- Every function (exported or internal) has roxygen2 documentation; wrap
-  roxygen comments at 80 characters.
-- Re-document after changing any roxygen comment (`devtools::document()`).
+- Every function — exported or internal — carries roxygen2 documentation; wrap
+  comments at 80 characters.
+- **Internal (non-exported) functions must be marked `@noRd`** so no `.Rd` help
+  file is generated for them. (roxygen generates an `.Rd` for any documented
+  object *without* `@noRd`, regardless of export — an undocumented-but-exported
+  vs internal distinction it does **not** make for you. Unmarked internals would
+  clutter the manual and trip `R CMD check`.) Exported functions get a real
+  `.Rd`.
+- Re-document (`devtools::document()`) after changing any roxygen block that
+  produces an `.Rd` — exported functions, or any internal one not marked
+  `@noRd`.
 - Every user-facing change earns a `NEWS.md` bullet (skip pure docs/internal
   refactors). Name the affected function early in the bullet and reference the
   issue/PR number before the final period: `(#123).`
@@ -139,6 +147,7 @@ correctness depends on it.
 
 These conventions plug into the r-science workflow spine:
 
+- Exploring whether this is the right thing to do at all → **`whiteboard`** skill.
 - Asked for a plan, design, or approach → **`plan`** skill.
 - Turning an approved plan into tests → **`tests`** skill (+
   `testing-r-packages` for mechanics).

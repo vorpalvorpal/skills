@@ -19,7 +19,9 @@ choice likely to cause significant performance issues.
 - Base pipe `|>`, not `%>%`. `\(x) ...` for one-line anonymous functions,
   `function(x) {...}` otherwise.
 - Run `styler` and `lintr` (tidyverse config) before committing; fix all lints.
-- Document exported functions with roxygen2.
+- Document every function with roxygen2; mark internal functions `@noRd` so
+  only exported functions generate `.Rd` help files. Re-document
+  (`devtools::document()`) after changing a roxygen block that produces an `.Rd`.
 - Comment non-obvious scientific/statistical choices with their justification
   and a reference to the original source where applicable.
 - Set/accept a seed for any stochastic code so behaviour is reproducible.
@@ -34,6 +36,7 @@ choice likely to cause significant performance issues.
   For full output from a tool RTK does compress, use `rtk proxy <command>`.
 
 ## Workflows
+- Exploring whether this is even the right thing to do → **whiteboard** skill.
 - Asked for a plan, design, or approach → follow the **plan** skill.
 - Turning an approved plan into tests → follow the **tests** skill.
 - Implementing a non-trivial change → follow the **implement** skill.

@@ -7,6 +7,8 @@ description: >
   game; anything that changes results is deferred to the user as a modelling
   decision.
 disable-model-invocation: true
+model: sonnet
+effort: high
 ---
 
 # Benchmarking and optimising scientific R code
@@ -71,6 +73,16 @@ results.
 | `bench::mark()` | Comparing alternatives, with memory and `check =` correctness |
 | `bench::press()` | How performance scales with input size |
 | `system.time()` | A quick one-off sanity check only |
+
+## Optimise by total cost, not per-call time
+
+What's worth optimising is `per-call cost × call count`, not per-call cost
+alone. A microsecond function on a hot path called 10,000 times dominates;
+a slow function called once at startup rarely matters. So before optimising,
+ask **where and how often is this called?** — the *cumulative* column of a
+`profvis` profile answers it directly. Optimise what is expensive in aggregate,
+not what merely looks slow in isolation; and conversely, don't bother speeding
+up something that's already fast and rarely called.
 
 ## Where the wins come from (in order)
 

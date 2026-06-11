@@ -7,6 +7,8 @@ description: >
   behaviour-changing optimisations for the user. Use when implementing a
   non-trivial change that already has a plan and tests.
 disable-model-invocation: true
+model: opus
+effort: high
 ---
 
 # Implementing a non-trivial change

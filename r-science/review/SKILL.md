@@ -7,6 +7,8 @@ description: >
   and delegates general code- and test-quality review to the existing
   reviewer skills.
 disable-model-invocation: true
+model: opus
+effort: high
 ---
 
 # Reviewing a scientific change against its plan

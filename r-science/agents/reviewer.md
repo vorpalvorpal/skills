@@ -38,7 +38,11 @@ Re-derive or spot-check against the reference — don't take the comment's word.
 - Code quality → invoke the `critical-code-reviewer` skill on the diff.
 - Test quality → invoke the `review-testing` skill.
 
-Summarise their findings under the shared severity tiers; don't repeat them.
+**Fold their findings into your report** under the shared severity tiers below
+— the orchestrator needs to see every real issue they raise. "Fold in" means
+consolidate everything into one ranked list, not paste three separate verbose
+reports or re-run the same analysis twice. Nothing material is dropped; it's
+just de-duplicated and ranked.
 
 ## Output
 
