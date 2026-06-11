@@ -87,9 +87,8 @@ examples, seed locally (`withr::local_seed()`).
 
 ## Documentation
 
-- Every user-facing (exported) function has roxygen2 documentation; wrap
+- Every function (exported or internal) has roxygen2 documentation; wrap
   roxygen comments at 80 characters.
-- Internal functions get ordinary comments, not roxygen.
 - Re-document after changing any roxygen comment (`devtools::document()`).
 - Every user-facing change earns a `NEWS.md` bullet (skip pure docs/internal
   refactors). Name the affected function early in the bullet and reference the
