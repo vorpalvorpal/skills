@@ -7,6 +7,8 @@ description: >
   and delegates general code- and test-quality review to the existing
   reviewer skills.
 disable-model-invocation: true
+model: opus
+effort: high
 ---
 
 # Reviewing a scientific change against its plan
@@ -112,16 +114,27 @@ Request Changes | Needs Discussion | Approve
 ```
 
 Use `file:line` references for every finding. "Approve" means no blocking
-issues after a rigorous review, not perfection. Hand the verdict and the
-divergence list back to the `implement` skill, which presents them to the user
-and drives the merge/close decision — `review` never merges on its own.
+issues after a rigorous review, not perfection.
+
+## Finalize — merge and close (only after Approve)
+
+`/review` is the last phase, so the merge/close decision lives **here**.
+
+- **Request Changes / Needs Discussion** → do not merge. Point the user at the
+  phase that fixes it (`/implement` for code, `/tests` for a missing spec) — and
+  for a major/scientific problem, back to `/plan` (which decides whether to
+  return to `/whiteboard`).
+- **Approve** → present the verdict and **ask whether to merge and close**,
+  listing any outstanding reasons not to. Only after an explicit **yes**:
+  1. open a PR linking the issue (`gh pr create`),
+  2. merge it (`gh pr merge`),
+  3. add the divergence list as an issue comment if there was one,
+  4. close the issue.
+
+Never merge on your own initiative — the explicit yes is required.
 
 ## Next step
 
-After delivering the verdict, surface the user's next move rather than leaving
-them to recall it:
-
-> - If there are findings to address, point back to the relevant phase command
->   (`/implement` to fix code, `/tests` to add a missing spec, …).
-> - If approved, the merge/close decision lives in `/implement`'s final
->   section — ask whether to proceed there.
+> Review complete — verdict: <…>. If approved and you're ready, I'll open the
+> PR, merge, and close the issue. Otherwise, here's what to address and which
+> command to run next.

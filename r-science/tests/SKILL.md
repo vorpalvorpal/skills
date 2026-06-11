@@ -6,6 +6,8 @@ description: >
   the plan made verbose. Use after a plan is approved and before (or
   alongside) implementation, when converting planned behaviour into tests.
 disable-model-invocation: true
+model: sonnet
+effort: high
 ---
 
 # Turning a plan into a behaviour specification
@@ -23,6 +25,12 @@ mechanics — file layout, expectations, fixtures, snapshots, mocking, withr
 cleanup — defer to the **testing-r-packages** skill and only summarise here.
 
 ## 1. Construct the skeleton from the plan
+
+**First, read the existing test file if there is one.** You are often *adding*
+to `test-{name}.R`, not writing it fresh. Check whether any existing test
+already covers a behaviour you were about to specify — if so, don't duplicate
+it; extend or reference it. Place new specs next to similar existing ones,
+match the file's style, and don't break or restructure what's already passing.
 
 - One test file per code file: `R/{name}.R` → `tests/testthat/test-{name}.R`.
 - One `describe("fn()", { ... })` per function the plan covers.

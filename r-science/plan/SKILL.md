@@ -7,6 +7,8 @@ description: >
   precisely enough — equations, invariants, references, edge cases — for the
   tests skill to derive the describe()/it() specs from it.
 disable-model-invocation: true
+model: opus
+effort: high
 ---
 
 # Creating an implementation plan
@@ -34,6 +36,10 @@ opening comment of the GitHub issue).
 Still hold a sceptical line: if making the brief concrete exposes a flaw in the
 direction itself, don't push through — see "Return to the whiteboard" below.
 
+**If a later phase sent you back here**, you're *revising* an existing plan
+(and its tests/benchmarks already exist) — amend what's wrong, keep what still
+holds, and note what changed; don't rewrite from scratch.
+
 ## 2. Anchor to GitHub and gather context
 
 Only once the whiteboard is settled:
@@ -49,11 +55,11 @@ Only once the whiteboard is settled:
 
 Before drafting, settle these up front:
 
-- **API stability / backwards compatibility.** Unless the user says otherwise,
-  if the package version is <1 or this is not a package do not enforce any
-  backwards compatibility. Do not reate shims, etc. If the package version is
-  >=1, actively check with the user if backward compatibility is required.
-  Do not assume.
+- **API stability / backwards compatibility.** Never assume it is required —
+  ask. Default by package version unless the user says otherwise: for a
+  pre-1.0 package (or anything that isn't a package), do **not** preserve
+  backwards compatibility or add shims. For a ≥1.0 package, actively check with
+  the user whether backwards compatibility is needed before designing.
 - **Correctness above performance.** Prioritise mathematical, statistical,
   physical, and biological correctness. Note — but do not silently "fix" —
   any modelling choice likely to cause significant performance issues.
