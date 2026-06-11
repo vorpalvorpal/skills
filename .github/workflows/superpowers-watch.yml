@@ -1,0 +1,51 @@
+name: Watch upstream (pcvelz/superpowers)
+
+# Monthly check of the superpowers paths we have forked from or reference.
+# Basic bash (no API/LLM): if a tracked file/dir changed or a new skill folder
+# appeared, open an issue and commit the refreshed manifest. SHAs are seeded on
+# the first run (no issue that run).
+
+on:
+  schedule:
+    - cron: "0 7 1 * *"   # 07:00 UTC on the 1st of each month
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Run watcher
+        id: watch
+        env:
+          REPORT_FILE: ${{ runner.temp }}/superpowers-report.md
+        run: bash .github/scripts/superpowers-watch.sh
+
+      - name: Commit refreshed manifest
+        run: |
+          if ! git diff --quiet -- .github/superpowers-watch.json; then
+            git add .github/superpowers-watch.json
+            git commit -m "chore: refresh superpowers-watch manifest"
+            git push origin HEAD:main
+          fi
+
+      - name: Open issue on change
+        if: steps.watch.outputs.CHANGES == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPORT_FILE: ${{ runner.temp }}/superpowers-report.md
+        run: |
+          gh issue create \
+            --title "Superpowers upstream changes ($(date +%Y-%m-%d))" \
+            --body-file "$REPORT_FILE"

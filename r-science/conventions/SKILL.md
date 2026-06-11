@@ -69,6 +69,22 @@ In package code, take an explicit `seed`/RNG argument rather than calling
 `set.seed()` as a side effect on the user's global stream. In tests and
 examples, seed locally (`withr::local_seed()`).
 
+## Data
+
+- **Tabular CSV data ships in Frictionless Data form** — a `datapackage.json`
+  (Table Schema) describing each CSV's fields, types, constraints, units, and
+  source. This makes the data self-describing and validatable, and pins down
+  the provenance of any reference/known-answer dataset. (See the `frictionless`
+  skill.)
+- **Store large or complex data, not as CSV**, by size and shape:
+  - **`qs2`** (`qs2::qs_save()` / `qs_read()`) for large R objects — fast,
+    compressed serialisation of model fits, arrays, lists, etc.
+  - **DuckDB** (a `.duckdb` database) for large or relational tabular data, or
+    when you need out-of-core queries rather than loading everything into
+    memory.
+  Choose by size and complexity: small flat table → Frictionless CSV; big R
+  object → `qs2`; big/relational/queried → DuckDB.
+
 ## Documentation
 
 - Every user-facing (exported) function has roxygen2 documentation; wrap

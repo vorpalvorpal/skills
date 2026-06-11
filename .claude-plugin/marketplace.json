@@ -47,7 +47,8 @@
         "./shiny/shiny-bslib",
         "./shiny/shiny-bslib-theming",
         "./ggsql/ggsql",
-        "./open-source/maintainer-decline"
+        "./open-source/maintainer-decline",
+        "./r-science/whiteboard"
       ]
     },
     {
