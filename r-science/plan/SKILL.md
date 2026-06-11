@@ -49,9 +49,11 @@ Only once the whiteboard is settled:
 
 Before drafting, settle these up front:
 
-- **API stability / backwards compatibility.** Do NOT add backwards
-  compatibility unless the user explicitly asks for it. State explicitly in
-  the plan whether it is required.
+- **API stability / backwards compatibility.** Unless the user says otherwise,
+  if the package version is <1 or this is not a package do not enforce any
+  backwards compatibility. Do not reate shims, etc. If the package version is
+  >=1, actively check with the user if backward compatibility is required.
+  Do not assume.
 - **Correctness above performance.** Prioritise mathematical, statistical,
   physical, and biological correctness. Note — but do not silently "fix" —
   any modelling choice likely to cause significant performance issues.
