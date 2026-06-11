@@ -94,9 +94,9 @@ expected values is your job, not the plan's:
 
 ## 4. Reproducibility and edge cases
 
-- **Seed every stochastic test.** Use `withr::local_seed()` (or
-  `set.seed()`); never rely on ambient RNG state. A flaky scientific test is
-  worse than no test.
+- **Seed every stochastic test. No exceptions.** Use `withr::local_seed()`
+  (or `set.seed()`); never rely on ambient RNG state. An unseeded test that
+  flakes is worse than no test — every time.
 - Give each edge case from the plan its own `it()`: `NA`/`NaN`/`Inf`, empty /
   zero-length input, degenerate cases (singular matrices, zero variance,
   n = 1), and boundary values. Assert the *documented* behaviour (propagate

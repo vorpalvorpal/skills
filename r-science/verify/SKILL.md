@@ -12,6 +12,12 @@ description: >
 A staged check that ends in **READY** or **NOT READY**. A failure in any gate
 blocks READY. Use it two ways:
 
+**Evidence before verdict — no exceptions.** NEVER declare READY (or "done",
+"works", "fixed") from memory or expectation. Run the relevant command *this
+turn*, read the full output and exit status, and only then state the verdict
+with that evidence. "Looks done" is not evidence; a verdict without a fresh run
+is a regression waiting to ship.
+
 - **Quick mode** — inside the `implement` debug loop, on the stage you're
   working: fast feedback on the specs and lints for that file.
 - **Full mode** — before committing a stage, and before opening a PR: the

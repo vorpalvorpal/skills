@@ -21,11 +21,13 @@ reference: the *why*, the edge cases, and the commands.
 
 ## Correctness first
 
-Prioritise mathematical, statistical, physical, ecological, and biological
-correctness above performance, terseness, and convenience. When a modelling or
-numerical choice is likely to cause a significant performance problem, **flag
-it — do not silently "fix" it** by trading away correctness. Surface the
-trade-off to the user instead (the `implement` skill collects these).
+This is the prime directive. **NEVER trade correctness for performance,
+terseness, or convenience** — mathematical, statistical, physical, ecological,
+and biological correctness come first, always. When a modelling or numerical
+choice is likely to cause a significant performance problem, **flag it; do not
+silently "fix" it** by trading away correctness. Surface the trade-off to the
+user instead (the `implement` skill collects these). Correctness traded for
+speed is a bug that ships looking like a feature — every time.
 
 Comment every non-obvious scientific or statistical choice with its
 justification and a reference to the original source where one exists (paper +

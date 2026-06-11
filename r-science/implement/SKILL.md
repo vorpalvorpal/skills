@@ -88,8 +88,8 @@ prompt must include. Key points:
 - Require functional-by-default code, roxygen2 on new exported functions, and
   in-code comments justifying scientific/statistical choices with references —
   this **overrides** any generic "don't add comments/docs" subagent default.
-- Scope is locked to the stage's files; behaviour-changing optimisations are
-  forbidden (they get deferred — see 3f).
+- Scope is locked to the stage's files. **Behaviour-changing optimisations are
+  forbidden in-stage — NEVER apply one silently.** They get deferred (see 3f).
 
 ### 3d. Review the subagent's work
 
@@ -159,8 +159,9 @@ When all stages are committed and green:
 1. Delegate the coding; never hand-write feature code yourself.
 2. Read relevant files before writing a subagent prompt — give accurate
    context, not "find the file".
-3. Correctness review is yours and is non-negotiable; don't rubber-stamp
-   subagent output.
+3. **Correctness review is yours and is non-negotiable. NEVER rubber-stamp
+   subagent output** — read the diff and check the science yourself, every
+   stage. A delegated change you didn't verify is a change you don't understand.
 4. Commit per stage, not all at the end. Stage specific files.
 5. Never force-push; never amend — new commits for fixes.
 6. Keep the plan file and tracking doc updated as you go.

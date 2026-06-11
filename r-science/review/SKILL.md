@@ -32,7 +32,7 @@ Read the plan, then the diff for the whole change (`git diff main..HEAD`).
   interface. For each, note whether it's an improvement, a regression, or
   neutral, and why. If it fully matches the plan, say so plainly.
 - Divergences aren't automatically bad — but they must be *surfaced*, never
-  silent. An undocumented divergence is a finding.
+  silent. **An undocumented divergence is ALWAYS a finding — no exceptions.**
 
 ## 2. Scientific soundness
 
