@@ -79,6 +79,13 @@ When adding a new plugin to `marketplace.json`, also update the root `README.md`
 | `quarto/` | Quarto document authoring |
 | `brand-yml/` | Shared skill registered under both `shiny` and `quarto` plugins |
 
+## Dogfooding
+
+When working **on this repository** and one of its skills is invoked (via
+slash command or by name), follow the version in the **working tree on the
+current branch** — read its `SKILL.md` directly — not any installed copy.
+Installed skills may be stale; the branch is the truth.
+
 ## Workflow Design Principles
 
 When designing or extending the r-science workflow (skills, agents, MCP tooling, issue conventions):
