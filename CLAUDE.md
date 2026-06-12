@@ -90,6 +90,13 @@ When designing or extending the r-science workflow (skills, agents, MCP tooling,
   - Farm easy, well-specified tasks out to cheap models; reserve capable models for judgement.
   - Don't pollute context windows: serve summaries by default (e.g. a closed issue's closing summary, not its full thread) and fetch full detail only on explicit request.
 
+## Dogfooding
+
+When working **on this repository** and one of its skills is invoked (via
+slash command or by name), follow the version in the **working tree on the
+current branch** — read its `SKILL.md` directly — not any installed copy.
+Installed skills may be stale; the branch is the truth.
+
 ## Workflow Design Principles
 
 When designing or extending the r-science workflow (skills, agents, MCP tooling, issue conventions):
