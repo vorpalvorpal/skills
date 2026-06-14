@@ -1,0 +1,822 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.9.38">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>workflow-redesign</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+</style>
+
+
+<script src="workflow-redesign_files/libs/clipboard/clipboard.min.js"></script>
+<script src="workflow-redesign_files/libs/quarto-html/quarto.js" type="module"></script>
+<script src="workflow-redesign_files/libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="workflow-redesign_files/libs/quarto-html/popper.min.js"></script>
+<script src="workflow-redesign_files/libs/quarto-html/tippy.umd.min.js"></script>
+<script src="workflow-redesign_files/libs/quarto-html/anchor.min.js"></script>
+<link href="workflow-redesign_files/libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="workflow-redesign_files/libs/quarto-html/quarto-syntax-highlighting-15634bcf2e68342d4ad2dfa704d543f6.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="workflow-redesign_files/libs/bootstrap/bootstrap.min.js"></script>
+<link href="workflow-redesign_files/libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="workflow-redesign_files/libs/bootstrap/bootstrap-138a6193a3bd40baf1e627da441a4734.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+
+
+</head>
+
+<body class="fullcontent quarto-light">
+
+<div id="quarto-content" class="page-columns page-rows-contents page-layout-article">
+
+<main class="content" id="quarto-document-content">
+
+
+
+
+<section id="workflow-redesign-draft-the-design-tree-as-a-research-programme" class="level1">
+<h1>Workflow redesign (draft) — the design tree as a research programme</h1>
+<blockquote class="blockquote">
+<p><strong>Status:</strong> initial draft, 2026-06-14. Builds on the whiteboard conversation that produced the diagrams below. Supersedes the <em>framing</em> in <code>updated_design.md</code> (kept for history) — that document drew an agile thesis on top of a waterfall skeleton; this one removes the skeleton. Not yet reconciled in detail with every child of #16 (see §9, §11).</p>
+</blockquote>
+<hr>
+<section id="the-reframe-in-one-paragraph" class="level2">
+<h2 class="anchored" data-anchor-id="the-reframe-in-one-paragraph">1. The reframe, in one paragraph</h2>
+<p>Stop modelling the workflow as a <strong>pipeline</strong> (<code>whiteboard → plan → implement</code> walked once) and model it as a <strong>scheduler walking a tree of hypotheses</strong>. “Whiteboard” and “plan” become <strong>moves you can make on any node</strong>, not global stages. <strong>Maturity means “risk retired,” not “release version.”</strong> The separate context windows you want are preserved — but they’re keyed by <strong>altitude × mode</strong> and re-entered on demand, not three singletons traversed left-to-right. The old three-conversation pipeline is exactly the <strong>depth-1 special case</strong> of this: a project that never fissions <em>looks</em> like whiteboard → plan → implement.</p>
+</section>
+<section id="why-the-previous-designs-felt-wrong" class="level2">
+<h2 class="anchored" data-anchor-id="why-the-previous-designs-felt-wrong">2. Why the previous designs felt wrong</h2>
+<ul>
+<li><strong>Genre fought thesis.</strong> A sequence diagram can only express a timeline; the swimlanes <em>are</em> the waterfall. Agile thoughts bolted into the prose couldn’t survive the diagram underneath.</li>
+<li><strong>Four axes were compressed into one “version” number.</strong> “pre-alpha → v1” silently mixed <em>fidelity of the artefact</em> with <em>confidence in the decision</em>. They’re orthogonal (a settled design can be a stub; a built v1 can be of doubtful design).</li>
+<li><strong>Release-tier semantics don’t fit design nodes.</strong> “alpha = API, no internal content” is meaningless for a high-altitude design decision.</li>
+</ul>
+</section>
+<section id="core-concepts" class="level2">
+<h2 class="anchored" data-anchor-id="core-concepts">3. Core concepts</h2>
+<section id="the-node-a-first-class-fractal-component" class="level3">
+<h3 class="anchored" data-anchor-id="the-node-a-first-class-fractal-component">3.1 The node — a first-class fractal component</h3>
+<p>One recursive type at every altitude. The old artefacts — <em>design brief</em>, <em>plan</em>, <em>stage</em>, <em>task</em> — collapse into <strong>a node at a given altitude and maturity</strong>. A node is a <strong>GitHub issue</strong> carrying:</p>
+<ul>
+<li>the <strong>markers</strong> already specified in #18 (<code>Part-of</code>, <code>aspect</code>, <code>Boundary</code>, <code>Blocked-by</code>, <code>Design</code>, <code>Eq</code>, <code>Cites</code>, <code>Dead-end</code>);</li>
+<li>two <strong>gauges</strong> (§3.2): <em>confidence</em> and <em>fidelity</em>;</li>
+<li>a <strong>body</strong> = the current settled statement;</li>
+<li>an <strong>append-only decision log</strong> (the issue comments) = rationale &amp; history, including rejected alternatives (§7).</li>
+</ul>
+</section>
+<section id="the-four-axes" class="level3">
+<h3 class="anchored" data-anchor-id="the-four-axes">3.2 The four axes</h3>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 14%">
+<col style="width: 48%">
+<col style="width: 17%">
+<col style="width: 19%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Axis</th>
+<th>Question it answers</th>
+<th>Range</th>
+<th>Source</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Altitude</strong></td>
+<td>Where in the tree?</td>
+<td>root → leaf</td>
+<td>tree depth (structural)</td>
+</tr>
+<tr class="even">
+<td><strong>Fidelity</strong></td>
+<td>How <em>real</em> is the artefact?</td>
+<td>stub → mock → real → tuned</td>
+<td>set by the <em>construct</em> move; arguably leaf-only</td>
+</tr>
+<tr class="odd">
+<td><strong>Confidence</strong></td>
+<td>How sure are we this is <em>right</em>?</td>
+<td>idea → tentative → settled</td>
+<td>set by <em>diverge</em>/<em>validate</em> (+ user)</td>
+</tr>
+<tr class="even">
+<td><strong>Centrality</strong></td>
+<td>How much rests on it?</td>
+<td>belt → core</td>
+<td><strong>derivable</strong> from the graph (closeness to root + <code>Boundary</code>/<code>Blocked-by</code> in-degree)</td>
+</tr>
+</tbody>
+</table>
+<p>Altitude and centrality are (largely) computable from the issue graph the #24 extractor already builds. Fidelity and confidence are set by the moves.</p>
+</section>
+<section id="maturity-risk-retired" class="level3">
+<h3 class="anchored" data-anchor-id="maturity-risk-retired">3.3 Maturity = risk retired</h3>
+<p>Read maturity as <strong>how much risk has been retired</strong> (Boehm’s spiral model), not as a release tier. This is what makes “advance the riskiest load-bearing node first” the natural policy (§5).</p>
+</section>
+<section id="the-blackboard-substrate-24" class="level3">
+<h3 class="anchored" data-anchor-id="the-blackboard-substrate-24">3.4 The blackboard substrate (= #24)</h3>
+<p>Agents never talk directly. They read/write a <strong>shared structure</strong> — the issues + markers — and a <strong>controller</strong> (the scheduler) decides who acts next. This is the classic <em>blackboard architecture</em>, and <strong>#24’s markers + extractor + linter + context-MCP are exactly that substrate.</strong> Nothing about #24 is wasted by this redesign; it is the load-bearing floor.</p>
+<ul>
+<li><strong>Body = current truth.</strong> <strong>Comments = append-only rationale log.</strong> (#17 already states this: <em>“full reasoning is in this issue’s comments… the body is the current settled statement.”</em>)</li>
+</ul>
+</section>
+</section>
+<section id="the-moves-replacing-the-phases" class="level2">
+<h2 class="anchored" data-anchor-id="the-moves-replacing-the-phases">4. The moves (replacing the phases)</h2>
+<p>The existing skills don’t disappear — they become <strong>moves invoked per node</strong>:</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 12%">
+<col style="width: 23%">
+<col style="width: 29%">
+<col style="width: 34%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Move</th>
+<th>Old skill</th>
+<th>What it does</th>
+<th>Window / model</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Diverge</strong></td>
+<td><code>whiteboard</code></td>
+<td>“Is this the right thing?” + scout</td>
+<td>new scoped window, opus</td>
+</tr>
+<tr class="even">
+<td><strong>Converge</strong></td>
+<td><code>plan</code></td>
+<td>Make concrete; <strong>decompose + schedule</strong> children (assign each a target maturity + a method)</td>
+<td>scoped window</td>
+</tr>
+<tr class="odd">
+<td><strong>Construct</strong></td>
+<td><code>tests</code> / <code>implement</code> / <code>benchmark</code></td>
+<td>Build a leaf to its target fidelity</td>
+<td>leaf window + subagents</td>
+</tr>
+<tr class="even">
+<td><strong>Validate</strong></td>
+<td><code>verify</code> / <code>review</code> / brief &amp; plan validators</td>
+<td>Tests green <strong>and</strong> face-validity; <strong>+ rationale recall</strong> (§7)</td>
+<td>scoped window</td>
+</tr>
+<tr class="odd">
+<td><strong>Restructure</strong></td>
+<td>(new, was implicit)</td>
+<td>Move a boundary / re-parent — a structural change owned by the parent</td>
+<td>parent window</td>
+</tr>
+</tbody>
+</table>
+<pre class="mermaid"><code>stateDiagram-v2
+    [*] --&gt; Stub: created by parent fission
+    Stub --&gt; Diverge
+    Diverge --&gt; Converge: direction settled
+    Diverge --&gt; Restructure: direction wrong, bump parent
+    Converge --&gt; Fission: too big, spawn child stubs + schedule
+    Converge --&gt; Construct: small enough, build
+    Fission --&gt; Decomposed
+    Decomposed --&gt; Settled: all children closed-completed
+    Decomposed --&gt; Diverge: a child bubbled up a design fault
+    Construct --&gt; Validate: tests green
+    Construct --&gt; Converge: plan fault (PLAN-MOD)
+    Validate --&gt; Settled: green tests AND face-validity AND rationale-recall clean
+    Validate --&gt; Construct: tests / face-validity fail
+    Validate --&gt; Diverge: unresolved objection OR design fault, "oh bugger"
+    Settled --&gt; Diverge: reopened by downstream design fault
+    Settled --&gt; [*]
+
+    note right of Diverge
+        Diverge = whiteboard (opus)
+        Converge = plan (decompose + schedule)
+        Construct = tests / implement / benchmark
+        MOVES, re-enterable - not one-pass phases
+    end note</code></pre>
+</section>
+<section id="the-scheduler-the-engine-the-old-diagrams-lacked" class="level2">
+<h2 class="anchored" data-anchor-id="the-scheduler-the-engine-the-old-diagrams-lacked">5. The scheduler (the engine the old diagrams lacked)</h2>
+<p>A <strong>cycle</strong>, not a line. Two-tier policy:</p>
+<ol type="1">
+<li><strong>Floor first — walking skeleton.</strong> Iterative-deepening: get the <em>whole</em> tree to <code>alpha</code> (APIs wired, internals mocked, end-to-end runnable) before deepening anything. You always have a coherent, runnable whole (an <em>anytime</em> algorithm).</li>
+<li><strong>Best-first above the floor.</strong> Advance the node maximising <strong>centrality × (1 − confidence)</strong> — the load-bearing thing you’re least sure of — using the <strong>cheapest rung of the cost ladder</strong> that can move its gauges (<em>reason → research → prototype → build</em>).</li>
+<li><strong>Batch / drain.</strong> Stay in a window and do as much as is fruitful before switching, to amortise the handoff tax.</li>
+</ol>
+<pre class="mermaid"><code>flowchart LR
+    A["Scan frontier&lt;br/&gt;(open nodes on the blackboard)"] --&gt; B{"Floor met?&lt;br/&gt;whole tree at alpha?"}
+    B -- no --&gt; C["Pick shallowest unmet node&lt;br/&gt;iterative-deepening = walking skeleton"]
+    B -- yes --&gt; D["Pick max centrality×(1−confidence)&lt;br/&gt;best-first = riskiest load-bearing node"]
+    C --&gt; E["Open SCOPED window&lt;br/&gt;(altitude × mode) + right model&lt;br/&gt;load root→N ancestor bodies only"]
+    D --&gt; E
+    E --&gt; F["Make the move via the cheapest&lt;br/&gt;cost-ladder rung that moves the gauges:&lt;br/&gt;reason → research → prototype → build"]
+    F --&gt; G["Write back to blackboard:&lt;br/&gt;node body + markers, update gauges"]
+    G --&gt; A</code></pre>
+<p>The priority rule is a <strong>starting heuristic</strong>, not gospel — see open questions.</p>
+</section>
+<section id="context-windows-altitude-mode" class="level2">
+<h2 class="anchored" data-anchor-id="context-windows-altitude-mode">6. Context windows (altitude × mode)</h2>
+<p>Each window is scoped, so the expensive model stays lean and high:</p>
+<ul>
+<li><strong>Forward work at node N</strong> loads the <strong>root→N ancestor bodies</strong> only (each as its current settled statement) — never sibling chaff or descendant guts.</li>
+<li><strong>Re-diverge at N</strong> <em>additionally</em> loads <strong>N’s own decision log</strong> (the rejection ledger + the failure that triggered re-entry) — see §7.</li>
+<li>The right <strong>model</strong> binds per window (opus to diverge; lesser models to scout and to orchestrate construction).</li>
+</ul>
+<p>This is #17’s altitude-relative serving, served by #24’s context-MCP.</p>
+</section>
+<section id="rationale-preservation-recall-the-memory-layer" class="level2">
+<h2 class="anchored" data-anchor-id="rationale-preservation-recall-the-memory-layer">7. Rationale preservation &amp; recall — the memory layer</h2>
+<p><strong>Problem.</strong> Divergence produces two outputs: the <em>conclusion</em> (chose A → body) and the <em>negative space</em> (rejected B because X → only ever in the transcript). A fresh re-diverge window loses the negative space; re-entering the old session drags back a stale, expensive, polluted transcript. Neither is acceptable.</p>
+<p><strong>Solution — two layers of defence:</strong></p>
+<section id="layer-1-the-alternatives-ledger-cheap-always" class="level3">
+<h3 class="anchored" data-anchor-id="layer-1-the-alternatives-ledger-cheap-always">Layer 1 — the alternatives ledger (cheap, always)</h3>
+<p>The <em>diverge</em> move’s deliverable is the chosen direction <strong>plus</strong> a lightweight ledger written to the append-only log:</p>
+<pre><code>considered: B  — verdict: rejected — reason: censoring breaks it (X) — status: live
+considered: C  — verdict: rejected — reason: too slow             — status: live</code></pre>
+<ul>
+<li><strong>Supersede, never delete.</strong> When A later fails, append <code>A — superseded — failed in impl: data is hierarchical (Z)</code>; the body becomes the new direction. (ADR semantics; your <code>state_reason</code>.)</li>
+<li><strong>Re-diverge loads this ledger</strong> (§6), so the cheap path catches the common case and <em>forces confrontation</em>: “B was rejected for X — does X still apply?”</li>
+<li><strong><code>status: overruled</code></strong> silences an objection once consciously overridden, so it stops re-firing.</li>
+</ul>
+</section>
+<section id="layer-2-rationale-recall-at-validation-expensive-commit-time-only" class="level3">
+<h3 class="anchored" data-anchor-id="layer-2-rationale-recall-at-validation-expensive-commit-time-only">Layer 2 — rationale recall at validation (expensive, commit-time only)</h3>
+<p>This is your mechanism, refined. Each brief records, as metadata, the <strong>session id(s)</strong> that produced it; at settle time the (collapsed) <strong>transcript is archived onto the issue</strong> keyed by that id (so it’s canonical and portable — not a local JSONL).</p>
+<p>At <strong>validation</strong> time only — never during generation, to keep the divergent window clean — the brief validator dispatches a <strong>scout</strong> over the node’s <strong>lineage</strong> logs and archived transcripts, looking for opposition to the proposed direction <strong>not addressed</strong> by the new brief. Anything unresolved is sent back to <em>resolve or overrule</em>.</p>
+<pre class="mermaid"><code>flowchart TB
+    subgraph GEN["Diverge window (generate) — clean, no past chaff"]
+        G1["Propose / refine brief for node N"]
+    end
+    subgraph SUB["Blackboard (durable, canonical)"]
+        L1["Node body — current settled statement"]
+        L2["Append-only ledger&lt;br/&gt;alternatives · verdicts · reasons · dead-ends&lt;br/&gt;status: live / overruled"]
+        L3["Archived transcripts&lt;br/&gt;keyed by session-id (collapsed on the issue)"]
+    end
+    subgraph VAL["Validate window (commit-time)"]
+        V1["Brief validator"]
+        V2["Scout: search lineage ledger + transcripts&lt;br/&gt;for opposition not addressed"]
+    end
+
+    G1 --&gt;|re-diverge loads| L2
+    G1 --&gt;|settle writes| L1
+    G1 --&gt;|settle appends| L2
+    G1 --&gt;|settle archives| L3
+    V1 --&gt; V2
+    V2 --&gt;|reads, cheap| L2
+    V2 --&gt;|reads, expensive, only here| L3
+    V2 --&gt;|unresolved objection| V1
+    V1 --&gt;|send back to resolve or overrule| G1</code></pre>
+<p><strong>Precedents:</strong> Architecture Decision Records (immutable, append-only, <em>supersedes</em> link, “considered alternatives”); IBIS / QOC design rationale — <em>and its cautionary tale</em> that full argument-tree capture is too heavy, hence Layer 1 stays one-liners; git history (body = working tree, log = history).</p>
+</section>
+</section>
+<section id="example-flows" class="level2">
+<h2 class="anchored" data-anchor-id="example-flows">8. Example flows</h2>
+<section id="greenfield-a-mixture-toxicity-r-package-condensed" class="level3">
+<h3 class="anchored" data-anchor-id="greenfield-a-mixture-toxicity-r-package-condensed">8.1 Greenfield — a mixture-toxicity R package (condensed)</h3>
+<ol type="1">
+<li><strong>Diverge @ root</strong> <em>(whiteboard, opus, loads nothing)</em> — is <strong>msPAF</strong> the right frame? Scout confirms. Write #1 body; direction confidence → HIGH.</li>
+<li><strong>Converge @ root</strong> <em>(plan, loads #1)</em> — decompose into #2 SSD fitting, #3 mixture model, #4 ingest, #5 reporting; set <code>Boundary #2↔︎#3</code>; tag #3 load-bearing+uncertain, #4/#5 routine. Create child stubs.</li>
+<li><strong>Floor — walking skeleton</strong> <em>(cheap model)</em> — wire every API, mock internals; <code>mixtox::score()</code> runs end-to-end returning a <em>typed, wrong</em> number. (Snapshot below.)</li>
+<li><strong>Best-first</strong> — #3 wins (high centrality, low confidence). <strong>Diverge @ #3</strong> <em>(new window, loads #1 + the boundary only)</em>. Scout does research, not a build: literature favours concentration addition. <strong>Converge @ #3</strong> → fission into #6 (CA, schedule to v1) and #7 (IA, left pre-alpha as a real option).</li>
+<li><strong>Construct @ #6</strong> to v1 <em>(leaf window + subagents)</em>; drain it. An FFT convolution loses to the direct loop → record <code>Dead-end</code>.</li>
+<li><strong>“Oh bugger”</strong> — #6 finds the boundary needs per-species sensitivities, not one HC5. Genuine boundary fault → reopen <strong>Converge @ #1</strong> (the parent that <em>owns</em> the boundary), not a global whiteboard.</li>
+<li><strong>Settle upward</strong> — #6 v1 (green + face-valid); #7 closed <code>not_planned</code>; #3 then #1 close as children settle.</li>
+</ol>
+<pre class="mermaid"><code>flowchart TD
+    classDef central fill:#ffd9d9,stroke:#c0392b,stroke-width:2px
+    classDef routine fill:#d9f0d9,stroke:#27ae60
+    classDef aspect fill:#fff6cc,stroke:#b7950b,stroke-dasharray:4 3
+    classDef future stroke-dasharray:5 4,color:#777
+
+    N1["#1 Mixture-toxicity package — ROOT&lt;br/&gt;direction: msPAF (settled) · conf:HIGH · fid:skeleton&lt;br/&gt;🧱 Boundary #2↔#3: SSD exposes per-species sensitivity, mg/L"]
+    N2["#2 SSD fitting&lt;br/&gt;conf:MED · fid:mock"]
+    N3["#3 Mixture model: CA vs IA&lt;br/&gt;⭐ load-bearing · conf:LOW · fid:mock"]:::central
+    N4["#4 Data ingest&lt;br/&gt;routine · conf:HIGH · fid:stub"]:::routine
+    N5["#5 Reporting&lt;br/&gt;routine · conf:HIGH · fid:stub"]:::routine
+    N6["#6 Concentration addition"]:::future
+    N7["#7 Independent action (fallback, kept cheap)"]:::future
+    ASP(["aspect: uncertainty-propagation"]):::aspect
+
+    N1 --&gt; N2 &amp; N3 &amp; N4 &amp; N5
+    N3 -. "next: fission after diverge@#3" .-&gt; N6
+    N3 -. "real option, left pre-alpha" .-&gt; N7
+    ASP -.-&gt; N2
+    ASP -.-&gt; N3
+    ASP -.-&gt; N5</code></pre>
+</section>
+<section id="deferred-wrong-re-diverge-the-rationale-recall-case" class="level3">
+<h3 class="anchored" data-anchor-id="deferred-wrong-re-diverge-the-rationale-recall-case">8.2 Deferred → wrong → re-diverge (the rationale-recall case)</h3>
+<ol type="1">
+<li><strong>Diverge @ #foo</strong> (session <strong>S1</strong>) — explore A, B, C; choose <strong>A</strong>. Ledger: <code>B — rejected — censoring (X)</code>, <code>C — rejected — too slow</code>. Archive S1 on the issue. Validate: lineage has nothing prior → passes. Defer.</li>
+<li><strong>+2 weeks, Construct @ #foo</strong> — A is fundamentally wrong (data is hierarchical, Z). Reopen <strong>Diverge @ #foo</strong> (session <strong>S2</strong>, fresh window). Append <code>A — superseded — failed: hierarchical data (Z)</code>.</li>
+<li><strong>Re-diverge</strong> loads #foo’s ledger (Layer 1). Tempted by <strong>B</strong> (it handles hierarchy!).
+<ul>
+<li><em>If the ledger entry is good:</em> B’s <code>rejected — censoring (X)</code> is right there → confront: does X apply? Our data is uncensored → record <code>X — overruled — data uncensored</code>; adopt B.</li>
+<li><em>If the ledger entry was too terse / missing:</em> we settle on B anyway.</li>
+</ul></li>
+<li><strong>Validate S2’s brief</strong> — rationale recall (Layer 2) scouts S1’s archived transcript, finds the objection X to B, sees the new brief doesn’t address it, and <strong>sends it back</strong>. Same confrontation as above — re-reject, or overrule with a recorded reason.</li>
+<li><strong>Settle B.</strong> The log now holds more than any single transcript ever did: A’s failure (Z), B’s old objection (X) and its overrule.</li>
+</ol>
+</section>
+</section>
+<section id="what-survives-what-changes" class="level2">
+<h2 class="anchored" data-anchor-id="what-survives-what-changes">9. What survives, what changes</h2>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 38%">
+<col style="width: 30%">
+<col style="width: 30%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Existing</th>
+<th>Status</th>
+<th>Change</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>#16 / #17 design tree + altitude context</td>
+<td><strong>keep</strong></td>
+<td>re-cast as the blackboard + scoped windows</td>
+</tr>
+<tr class="even">
+<td>#24 markers / extractor / linter / MCP</td>
+<td><strong>keep</strong></td>
+<td>extend: 2 gauges, the ledger, rationale-recall, transcript archival</td>
+</tr>
+<tr class="odd">
+<td>#18 marker vocabulary</td>
+<td><strong>keep</strong></td>
+<td>add gauges + a rejected-alternative marker (or broaden <code>Dead-end</code>)</td>
+</tr>
+<tr class="even">
+<td>#22 dead-ends</td>
+<td><strong>keep, broaden</strong></td>
+<td>cover <em>design-time reasoned</em> rejections, not only <em>empirical</em> ones</td>
+</tr>
+<tr class="odd">
+<td><code>whiteboard</code> / <code>plan</code> / <code>tests</code> / <code>implement</code> / <code>verify</code> / <code>review</code> skills</td>
+<td><strong>keep as moves</strong></td>
+<td>invoked per node by the scheduler, not as global phases</td>
+</tr>
+<tr class="even">
+<td>brief / plan validators</td>
+<td><strong>keep, extend</strong></td>
+<td>add the Layer-2 rationale recall</td>
+</tr>
+<tr class="odd">
+<td>release tiers (pre-alpha…v1)</td>
+<td><strong>drop</strong></td>
+<td>replace with the two gauges</td>
+</tr>
+<tr class="even">
+<td>three-conversation sequence diagram</td>
+<td><strong>drop</strong></td>
+<td>replace with tree + scheduler (it’s the depth-1 case)</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="open-questions-needs-development" class="level2">
+<h2 class="anchored" data-anchor-id="open-questions-needs-development">10. Open questions / needs development</h2>
+<p><strong>Gauges</strong> 1. <em>Confidence</em>: who sets it, on what scale (discrete idea/tentative/settled vs continuous)? Derive partly from # unresolved open-questions / validation status? 2. <em>Centrality</em>: exact graph metric (depth + <code>Boundary</code>/<code>Blocked-by</code> in-degree? PageRank-style?). Does it need human override? 3. <em>Fidelity for non-leaf design nodes</em> — is it leaf-only (design nodes carry only confidence)? Likely yes; confirm.</p>
+<p><strong>Scheduler</strong> 4. Tune <code>centrality × (1 − confidence)</code>: tie-breaking, starvation, when to stop (the anytime <em>stopping rule</em> — when is the project “done enough”?). 5. Define the <strong>floor</strong> precisely: is “whole tree at alpha” always wanted? Does it apply per-subtree or only at root? What’s “alpha” for a non-software artefact (e.g.&nbsp;a management plan)?</p>
+<p><strong>Memory / recall</strong> 6. <strong>Transcript archival</strong>: cost/size of storing transcripts on issues; secrets redaction; compaction. Graceful degradation when only a local session remains. 7. <strong>Recall scope</strong>: lineage-only (this draft) vs cross-node/aspect-level (“rejected elsewhere in the project”). The latter is more powerful, more expensive. 8. <strong>“Addressed” judgement</strong> reliability: false positives (nagging) vs misses; the <code>overruled</code> state as the silencer — is one bit enough? 9. <strong>Marker design</strong>: extend <code>Dead-end</code> vs add a <code>Rejected:</code> marker; encode the <code>status: live/overruled</code> field; how the linter checks it.</p>
+<p><strong>Moves &amp; control</strong> 10. <strong>Re-diverge routing</strong>: on a construct failure, who decides construct → converge (plan fault) vs → diverge (design fault) vs → restructure parent (boundary fault) — the failing agent, the orchestrator, or the user? 11. <strong>Human approval points</strong>: which moves need human sign-off (settle? fission? merge?) vs run autonomously. The old design had explicit user sign-offs at each phase. 12. <strong>Concurrency</strong>: parallel work on independent nodes (background subagents); blackboard write conflicts; the linter as a CI invariant.</p>
+<p><strong>Substrate &amp; portability</strong> 13. <strong>Session id is a Claude-Code concept</strong> — how portable is Layer 2 beyond Claude Code / GitHub? (CLAUDE.md portability aim.) 14. <strong>Bootstrapping</strong>: <code>/new-sci</code> (#11) as root-node creation under this model. 15. <strong>Multiple real collaborators</strong>: the “same person in every window” assumption — does the blackboard model already cover real teams? (Probably, but unexamined.)</p>
+<p><strong>Next steps to harden this draft</strong> - Write the gauge + rejected-alternative marker spec (extends #18/#24). - Prototype the scheduler heuristic on the mixture-toxicity example by hand. - Decide transcript archival format and the validator’s recall prompt. - Reconcile §9 against each #16 child issue and re-issue the epic. - Pick one real package to dogfood end-to-end.</p>
+</section>
+<section id="relationship-to-the-16-epic" class="level2">
+<h2 class="anchored" data-anchor-id="relationship-to-the-16-epic">11. Relationship to the #16 epic</h2>
+<p>This is less a replacement than a <strong>promotion</strong>: #16 built a <em>context layer</em>; this adds the <strong>control layer</strong> (scheduler + gauges + moves-not-phases) that <em>uses</em> it, plus the <strong>memory layer</strong> (§7). The substrate (#24) is necessary and nearly sufficient as the blackboard. Suggested sequencing unchanged: <strong>#24 first</strong> (it’s the floor), then the gauges/marker extensions, then teach the existing skills to behave as moves under a scheduler.</p>
+</section>
+</section>
+
+</main>
+<!-- /main column -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp('/' + window.location.host + '/');
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+
+
+
+
+</body></html>
