@@ -71,9 +71,66 @@ Use for multi-line prose, LaTeX `align` blocks, and rationale text.
 | 📐 | `Design:` | single issue ref `#\d+` → `int` | inline |
 | 🟰 | `Eq:` | equation key / identifier → `str` | inline (block for multi-line LaTeX) |
 | 📚 | `Cites:` | comma-list of citation keys → `list[str]` | inline |
-| 🪦 | `Dead-end:` | rationale prose → `str` | block |
+| 🧭 | `Confidence:` | `low` \| `tentative` \| `high` → `str` (gauge) | inline |
+| 📊 | `Fidelity:` | `stub` \| `interface` \| `mock` \| `correct` → `str` (gauge) | inline |
+| 🔒 | `Seal:` | `sealed`\|`unsealed` (+ optional who/when) → `str` | inline |
+| ❓ | `Question:` | keyed `q` → `Keyed` | inline / block |
+| ✅ | `Validation:` | keyed `v` → `Keyed` | inline / block |
+| ⚖️ | `Alternative:` | keyed `alt` → `Keyed` | inline / block |
+| 🔮 | `Future:` | keyed `fd` → `Keyed` | inline / block |
+| ⚡ | `Optimisation:` | keyed `opt` → `Keyed` | inline / block |
+| 🪦 | `Dead-end:` | keyed `de` → `Keyed` | inline / block |
+| 🗄️ | `Artefact:` | keyed `art` → `Keyed` | inline / block |
 
 ---
+
+## Keyed markers
+
+Some markers are **tracked items** carrying a stable id and an evolving status, so
+a later comment supersedes an earlier one by id (the fold; see `context-spec.md`).
+
+- **Id:** `#<issue>.<prefix><n>` — e.g. `#16.q4`. The prefix encodes the kind and
+  must match it; the issue-part must match the carrying node (checked by I9).
+- **Value grammar:** `<id> [<status>] [<text>]`. First token is the id; if the
+  second token is one of the kind's status words it is the status, else the
+  default applies and the remainder is text. `render` always emits the status, so
+  the round-trip is unambiguous.
+- **Block form with id:** when the inline value is just the id (+ optional
+  status), the immediately-following blockquote is the text — so a detailed
+  dead-end or artefact keeps its id inline and its body in the quote.
+
+| Kind | prefix | default status → others |
+|------|--------|-------------------------|
+| `Question` | `q` | `open` → `answered` |
+| `Validation` | `v` | `open` → `met` / `unmet` |
+| `Alternative` | `alt` | `proposed` → `rejected` / `viable` / `chosen` |
+| `Future` | `fd` | `declared` → `activated` / `dropped` |
+| `Optimisation` | `opt` | `declared` → `done` / `dropped` |
+| `Dead-end` | `de` | `closed` → `revived` |
+| `Artefact` | `art` | `live` → `stale` |
+
+```
+⚖️ Alternative: #16.alt1 rejected censored data breaks it
+… later comment supersedes by id …
+⚖️ Alternative: #16.alt1 viable our data is uncensored, X moot
+
+🪦 Dead-end: #7.de1
+> Tried FFT convolution; padding dominated at n<512.
+```
+
+I8 flags a sigil-less keyed keyword (e.g. `Future:`) only when an id follows it,
+so ordinary prose beginning with such a word is not a false positive.
+
+## Gauges and seal
+
+Unkeyed, single-valued markers; the latest one in a node's stream wins. A value
+outside the allowed set is a Finding (never silently dropped).
+
+- `🧭 Confidence:` — `low` | `tentative` | `high`.
+- `📊 Fidelity:` — `stub` | `interface` | `mock` | `correct` (a parent's effective
+  fidelity is the min over its load-bearing children).
+- `🔒 Seal:` — `sealed` | `unsealed` (+ optional `@who` and date). Default is
+  **sealed**, inherited from the nearest sealed/unsealed ancestor.
 
 ## Per-marker examples
 
@@ -247,33 +304,24 @@ Not registered; code block suppresses extraction.
 
 ### 🪦 `Dead-end:`
 
-Records a rationale for a design path that was tried and rejected.  Always
-block form.  The value is the text of the immediately-following `>` blockquote,
-with `> ` prefixes stripped and lines joined by `\n`.
+A **keyed** marker (prefix `de`) — see [Keyed markers](#keyed-markers). Records a
+rejected design path; the id is inline, the rationale is the body (inline, or the
+immediately-following blockquote for detail).
 
-**Positive:**
+**Positive (block body):**
 ```
-🪦 Dead-end:
+🪦 Dead-end: #7.de1
 > Tried FFT-based convolution.  Padding to next pow2 dominated
 > cost at n<512; the direct loop was 3× faster in that regime.
 ```
-Parses to:
-```
-Marker(DEAD_END,
-       "Tried FFT-based convolution.  Padding to next pow2 dominated\n"
-       "cost at n<512; the direct loop was 3× faster in that regime.",
-       line)
-```
+Parses to `Marker(DEAD_END, Keyed("#7.de1", "closed", "Tried FFT-based
+convolution. …"), line)`.
 
-**Negative — quoting blockquote, not preceded by an empty-value marker:**
-```
-Quoting #17 below:
+**Negative — no id:** `🪦 Dead-end:` with a blockquote but no id is a Finding —
+keyed markers require an id.
 
-> 🪦 Dead-end:
-> Tried something else.
-```
-The outer blockquote is standalone (no immediately-preceding empty-value
-marker), so nothing inside it is extracted.  No marker is registered.
+**Negative — quoting blockquote:** a standalone blockquote (not the body of an
+immediately-preceding marker line) is inert; nothing inside is registered.
 
 ---
 
