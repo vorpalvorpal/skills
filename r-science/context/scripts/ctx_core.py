@@ -55,6 +55,8 @@ ALTERNATIVE = "alternative"
 FUTURE = "future"
 OPT = "opt"
 ARTEFACT = "artefact"
+PRO = "pro"
+CON = "con"
 
 # ---------------------------------------------------------------------------
 # Glyph vocabulary
@@ -89,6 +91,8 @@ _G_ALTERNATIVE = _norm("⚖️")
 _G_FUTURE      = _norm("🔮")
 _G_OPT         = _norm("⚡")
 _G_ARTEFACT    = _norm("🗄️")
+_G_PRO         = _norm("➕")
+_G_CON         = _norm("➖")
 
 
 def _parse_issue_list(raw: str, line: int) -> tuple[list[int] | None, Finding | None]:
@@ -162,28 +166,37 @@ KEYED: dict = {
     OPT:         ("opt", "declared", frozenset({"declared", "done", "dropped"})),
     DEAD_END:    ("de",  "closed",   frozenset({"closed", "revived"})),
     ARTEFACT:    ("art", "live",     frozenset({"live", "stale"})),
+    # Pro/Con are keyed *under an option* — their id has an extra segment
+    # (#<issue>.<opt><n>.p<n>); the parser below uses a custom id pattern.
+    PRO:         ("p",   "standing", frozenset({"standing", "refuted", "moot"})),
+    CON:         ("c",   "standing", frozenset({"standing", "refuted", "moot"})),
 }
 
 _WS_SPLIT = re.compile(r"^(\S+)\s*(.*)$", re.DOTALL)
 
 
-def _make_keyed_parser(prefix: str, default_status: str, status_set: frozenset) -> Callable:
+def _make_keyed_parser(prefix: str, default_status: str, status_set: frozenset,
+                       id_pattern: str | None = None, id_hint: str | None = None) -> Callable:
     """Build a parser for `<id> [<status>] [<text>]`, id = #<issue>.<prefix><n>.
 
     The id's prefix must match this kind. An unrecognised second token is text,
     not status (the default status then applies). Returns a Keyed value.
+
+    `id_pattern`/`id_hint` override the default id shape — used by Pro/Con, whose
+    ids carry an extra option segment (#<issue>.<opt><n>.p<n>).
     """
-    id_re = re.compile(rf"^#\d+\.{prefix}\d+$")
+    id_re = re.compile(id_pattern or rf"^#\d+\.{prefix}\d+$")
+    hint = id_hint or f"#<issue>.{prefix}<n>"
 
     def parser(raw: str, line: int):
         v = raw.strip()
         if not v:
-            return None, Finding(0, "parse", f"keyed marker needs an id like #16.{prefix}1", line=line)
+            return None, Finding(0, "parse", f"keyed marker needs an id like {hint}", line=line)
         mid = _WS_SPLIT.match(v)
         idtok, rest = mid.group(1), mid.group(2)
         if not id_re.match(idtok):
             return None, Finding(0, "parse",
-                                 f"bad keyed id {idtok!r}; expected #<issue>.{prefix}<n>", line=line)
+                                 f"bad keyed id {idtok!r}; expected {hint}", line=line)
         status, text = default_status, rest
         mst = _WS_SPLIT.match(rest)
         if mst and mst.group(1) in status_set:
@@ -229,6 +242,10 @@ _VOCAB: list[tuple[str, str, str, Callable, bool]] = [
     (_G_FUTURE,      r"Future",      FUTURE,      _make_keyed_parser(*KEYED[FUTURE]),      False),
     (_G_OPT,         r"Optimisation",OPT,         _make_keyed_parser(*KEYED[OPT]),         False),
     (_G_ARTEFACT,    r"Artefact",    ARTEFACT,    _make_keyed_parser(*KEYED[ARTEFACT]),    False),
+    (_G_PRO, r"Pro", PRO, _make_keyed_parser("p", "standing", KEYED[PRO][2],
+        id_pattern=r"^#\d+\.[a-z]+\d+\.p\d+$", id_hint="#<issue>.<opt>.p<n>"), False),
+    (_G_CON, r"Con", CON, _make_keyed_parser("c", "standing", KEYED[CON][2],
+        id_pattern=r"^#\d+\.[a-z]+\d+\.c\d+$", id_hint="#<issue>.<opt>.c<n>"), False),
 ]
 
 # Bare keyword patterns for I8 (sigil-less line detection)
@@ -556,6 +573,8 @@ _KIND_TO_KW: dict[str, str] = {
     FUTURE:      "Future",
     OPT:         "Optimisation",
     ARTEFACT:    "Artefact",
+    PRO:         "Pro",
+    CON:         "Con",
 }
 
 # Glyph for rendering (normalised, no trailing FE0F).
@@ -577,6 +596,8 @@ _KIND_TO_GLYPH: dict[str, str] = {
     FUTURE:      _G_FUTURE,
     OPT:         _G_OPT,
     ARTEFACT:    _G_ARTEFACT,
+    PRO:         _G_PRO,
+    CON:         _G_CON,
 }
 
 

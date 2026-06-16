@@ -86,6 +86,8 @@ Use for multi-line prose, LaTeX `align` blocks, and rationale text.
 | ⚡ | `Optimisation:` | keyed `opt` → `Keyed` | inline / block |
 | 🪦 | `Dead-end:` | keyed `de` → `Keyed` | inline / block |
 | 🗄️ | `Artefact:` | keyed `art` → `Keyed` | inline / block |
+| ➕ | `Pro:` | keyed under an option (`<opt>.p`) → `Keyed` | inline / block |
+| ➖ | `Con:` | keyed under an option (`<opt>.c`) → `Keyed` | inline / block |
 
 ---
 
@@ -113,6 +115,8 @@ a later comment supersedes an earlier one by id (the fold; see `context-spec.md`
 | `Optimisation` | `opt` | `declared` → `done` / `dropped` |
 | `Dead-end` | `de` | `closed` → `revived` |
 | `Artefact` | `art` | `live` → `stale` |
+| `Pro` | `<opt>.p` | `standing` → `refuted` / `moot` |
+| `Con` | `<opt>.c` | `standing` → `refuted` / `moot` |
 
 ```
 ⚖️ Alternative: #16.alt1 rejected censored data breaks it
@@ -125,6 +129,29 @@ a later comment supersedes an earlier one by id (the fold; see `context-spec.md`
 
 I8 flags a sigil-less keyed keyword (e.g. `Future:`) only when an id follows it,
 so ordinary prose beginning with such a word is not a false positive.
+
+## Pros & cons (sub-keyed under an option)
+
+`➕ Pro:` and `➖ Con:` attach a tradeoff to an **option** — an `alt`/`fd`/`opt`
+marker — by extending its id with a `.p<n>` / `.c<n>` segment:
+
+```
+⚖️ Alternative: #37.alt1 proposed one move-skill parametrised by (move × seal)
+➕ Pro: #37.alt1.p1 standing one FSM owner; shared seal handling written once
+➖ Con: #37.alt1.c1 standing prompt bloat — all-move instructions in one place
+… later, when a con is shown wrong …
+➖ Con: #37.alt1.c1 refuted bloat avoided by per-move fragments
+```
+
+Each pro/con is **individually folded latest-wins by id**, so a single one can be
+superseded (`standing → refuted`) or made `moot` (infrastructure elsewhere changed
+the calculus) without touching its siblings. Status default is `standing`.
+
+The MCP decides **visibility by mode**: serve pros/cons during a *converge*/decision
+move, withhold them during a fresh *re-diverge* so a re-assessment isn't anchored.
+They are **optional and one line each** — the linter never demands them. An optional
+free-text `[dimension]` tag may lead the body (e.g. `[performance]`, `[difficulty]`)
+for future MCP grouping; it is convention, not parsed.
 
 ## Gauges and seal
 
