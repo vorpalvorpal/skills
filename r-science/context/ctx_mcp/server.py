@@ -118,3 +118,76 @@ def query_registry(source, key: str):
 def query_deadends(source, scope: int) -> list:
     """Scoped: only the dead-ends recorded against `scope`."""
     return list(source.dead_ends.get(scope, []))
+
+
+# ---------------------------------------------------------------------------
+# MCP-SDK transport (lazy: the SDK is imported only when a server is built, so
+# the pure functions above stay importable and testable without `mcp`).
+# ---------------------------------------------------------------------------
+def _context_payload(source, issue):
+    return [
+        {"number": v.number, "body": v.body,
+         "state": v.state, "state_reason": v.state_reason}
+        for v in get_context(source, issue)
+    ]
+
+
+def build_server(source, name: str = "ctx-context"):
+    """Register the serving functions as MCP tools over `source`. Returns a FastMCP app."""
+    from mcp.server.fastmcp import FastMCP
+
+    app = FastMCP(name)
+
+    @app.tool()
+    def context(issue: int):
+        """Ancestor path root→issue (bodies + state only; the altitude rule)."""
+        return _context_payload(source, issue)
+
+    @app.tool()
+    def thread(issue: int):
+        """Full comment stream for one node (opt-in detail)."""
+        return get_thread(source, issue)
+
+    @app.tool()
+    def siblings(issue: int):
+        """Sibling titles + one-line purposes (not bodies)."""
+        return get_siblings(source, issue)
+
+    @app.tool()
+    def children(issue: int):
+        """Child titles + one-line purposes (not bodies)."""
+        return get_children(source, issue)
+
+    @app.tool()
+    def registry(key: str):
+        """A single registry entry by key (scoped, never the whole index)."""
+        return query_registry(source, key)
+
+    @app.tool()
+    def deadends(scope: int):
+        """Dead-ends scoped to one node's subtree."""
+        return query_deadends(source, scope)
+
+    return app
+
+
+def serve(repo: str, *, scripts_dir: str | None = None) -> None:  # pragma: no cover - I/O entry
+    """Build a live server over `repo` and run it on stdio."""
+    import os
+    import sys
+
+    sd = scripts_dir or os.path.join(os.path.dirname(__file__), "..", "scripts")
+    if sd not in sys.path:
+        sys.path.insert(0, sd)
+    import ctx_source
+
+    build_server(ctx_source.RepoSource(repo)).run()
+
+
+if __name__ == "__main__":  # pragma: no cover
+    import sys
+
+    if len(sys.argv) < 2:
+        print("usage: server.py <owner/repo>", file=sys.stderr)
+        raise SystemExit(2)
+    serve(sys.argv[1])

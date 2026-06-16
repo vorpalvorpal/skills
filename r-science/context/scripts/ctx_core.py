@@ -400,6 +400,10 @@ class _Registry:
     def __getitem__(self, key: str) -> list:
         return self._data[key]
 
+    def items(self):
+        """(key, [issue, ...]) pairs — for adapters building a serving view."""
+        return self._data.items()
+
 
 # ---------------------------------------------------------------------------
 # Normalisation helpers
