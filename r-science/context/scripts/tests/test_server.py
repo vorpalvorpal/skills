@@ -71,18 +71,15 @@ def source():
 # get_context — the altitude rule
 # --------------------------------------------------------------------------
 class TestGetContext:
-    @pytest.mark.skip(reason=PENDING)
     def test_returns_ordered_root_to_target_bodies(self, source):
         views = server.get_context(source, 17)
         assert [v.number for v in views] == [16, 17]
         assert [v.body for v in views] == ["root body", "design body"]
 
-    @pytest.mark.skip(reason=PENDING)
     def test_includes_state_and_state_reason(self, source):
         views = server.get_context(source, 17)
         assert all(hasattr(v, "state") and hasattr(v, "state_reason") for v in views)
 
-    @pytest.mark.skip(reason=PENDING)
     def test_never_volunteers_comments_or_siblings_or_children(self, source):
         views = server.get_context(source, 17)
         blob = repr(views)
@@ -94,18 +91,15 @@ class TestGetContext:
 # Opt-in detail
 # --------------------------------------------------------------------------
 class TestOptInDetail:
-    @pytest.mark.skip(reason=PENDING)
     def test_get_thread_returns_full_comments(self, source):
         assert server.get_thread(source, 16) == ["c16-a", "c16-b"]
 
-    @pytest.mark.skip(reason=PENDING)
     def test_siblings_are_titles_and_purposes_not_bodies(self, source):
         sibs = server.get_siblings(source, 17)
         blob = repr(sibs)
         assert "Sibling" in blob and "a sibling slice" in blob
         assert "sib body" not in blob
 
-    @pytest.mark.skip(reason=PENDING)
     def test_children_are_titles_and_purposes_not_bodies(self, source):
         kids = server.get_children(source, 16)
         blob = repr(kids)
@@ -117,13 +111,11 @@ class TestOptInDetail:
 # Registry / dead-end queries — scoped, never the whole index (token rule)
 # --------------------------------------------------------------------------
 class TestScopedQueries:
-    @pytest.mark.skip(reason=PENDING)
     def test_query_registry_returns_a_single_entry(self, source):
         entry = server.query_registry(source, "smith2020")
         assert entry["source"] == "Smith et al. 2020"
         assert "smith2020_msPAF" not in repr(entry)   # not the whole index
 
-    @pytest.mark.skip(reason=PENDING)
     def test_query_deadends_returns_only_the_scoped_subset(self, source):
         result = server.query_deadends(source, 17)
         assert result == ["FFT padding too slow"]
@@ -134,14 +126,12 @@ class TestScopedQueries:
 # Broken-edge handling — structured error, not a hang
 # --------------------------------------------------------------------------
 class TestBrokenEdges:
-    @pytest.mark.skip(reason=PENDING)
     def test_missing_parent_raises_structured_error_naming_the_edge(self, source):
         source.nodes[17]["parent"] = 999          # dangling parent
         with pytest.raises(server.ContextError) as exc:
             server.get_context(source, 17)
         assert "999" in str(exc.value)
 
-    @pytest.mark.skip(reason=PENDING)
     def test_cycle_while_walking_raises_rather_than_hangs(self, source):
         source.nodes[16]["parent"] = 17           # 16<->17 cycle
         source.nodes[17]["parent"] = 16
