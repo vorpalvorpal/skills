@@ -1000,6 +1000,53 @@ def _check_i8(model: Model, platform: Platform) -> list:
     return findings
 
 
+def _check_i9(model: Model, platform: Platform) -> list:
+    """I9: a keyed marker's id issue-part must match the node that carries it."""
+    findings: list = []
+    for kind, items in model.registries.items():
+        for issue, kv in items:
+            m = re.match(r"#(\d+)\.", kv.id)
+            if m and int(m.group(1)) != issue:
+                findings.append(Finding(
+                    issue, "I9",
+                    f"keyed id {kv.id} is carried by #{issue} but names a different issue",
+                ))
+    return findings
+
+
+def _check_i12(model: Model, platform: Platform) -> list:
+    """I12: a node labelled 'dormant' must be closed."""
+    findings: list = []
+    for issue, node in model.nodes.items():
+        if "dormant" in node.labels and node.state != "closed":
+            findings.append(Finding(
+                issue, "I12", "node is labelled 'dormant' but is not closed",
+            ))
+    return findings
+
+
+def _check_i13(model: Model, platform: Platform) -> list:
+    """I13: a 'correct' node's non-dormant children must also be 'correct'."""
+    findings: list = []
+    children = _children_of(model)
+    for issue in model.nodes:
+        if model.gauges.get(issue, {}).get("fidelity") != "correct":
+            continue
+        for child in children.get(issue, set()):
+            if child in model.dormant:
+                continue
+            cfid = model.gauges.get(child, {}).get("fidelity")
+            if cfid != "correct":
+                findings.append(Finding(
+                    child, "I13",
+                    f"#{issue} is 'correct' but child #{child} is '{cfid or 'unset'}'",
+                ))
+    return findings
+
+
+# I10 (cross-reference resolution) and I11 (value-set validity) are deferred:
+# value validity is enforced at parse time, and prose cross-reference scanning is
+# noisy — see context-spec.md §7.
 CHECKS: dict = {
     "I1": _check_i1,
     "I2": _check_i2,
@@ -1009,4 +1056,7 @@ CHECKS: dict = {
     "I6": _check_i6,
     "I7": _check_i7,
     "I8": _check_i8,
+    "I9": _check_i9,
+    "I12": _check_i12,
+    "I13": _check_i13,
 }
