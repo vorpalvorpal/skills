@@ -28,7 +28,6 @@ PENDING = "pending — Stage 3 (fetch adapter)"
 # Transport selection: gh primary, REST fallback, classed auth error
 # --------------------------------------------------------------------------
 class TestTransportSelection:
-    @pytest.mark.skip(reason=PENDING)
     def test_uses_gh_cli_when_available(self, monkeypatch):
         monkeypatch.setattr(ctx_fetch, "_has_gh", lambda: True)
         monkeypatch.setattr(ctx_fetch, "_gh_json",
@@ -38,7 +37,6 @@ class TestTransportSelection:
         nodes = ctx_fetch.fetch_repo("owner/repo")
         assert [n.number for n in nodes] == [16]
 
-    @pytest.mark.skip(reason=PENDING)
     def test_falls_back_to_rest_with_token(self, monkeypatch):
         monkeypatch.setattr(ctx_fetch, "_has_gh", lambda: False)
         monkeypatch.setattr(ctx_fetch, "_token", lambda: "ghp_xxx")
@@ -50,7 +48,6 @@ class TestTransportSelection:
         nodes = ctx_fetch.fetch_repo("owner/repo")
         assert [n.number for n in nodes] == [16]
 
-    @pytest.mark.skip(reason=PENDING)
     def test_classed_error_when_no_gh_and_no_token(self, monkeypatch):
         monkeypatch.setattr(ctx_fetch, "_has_gh", lambda: False)
         monkeypatch.setattr(ctx_fetch, "_token", lambda: None)
@@ -62,7 +59,6 @@ class TestTransportSelection:
 # Rate limiting: bounded backoff, then a classed operational error
 # --------------------------------------------------------------------------
 class TestRateLimiting:
-    @pytest.mark.skip(reason=PENDING)
     def test_retries_then_raises_operational_error(self, monkeypatch):
         calls = {"n": 0}
 
@@ -84,7 +80,6 @@ class TestRateLimiting:
 # Pagination: comments > 30, sub-issues ≤ 100
 # --------------------------------------------------------------------------
 class TestPagination:
-    @pytest.mark.skip(reason=PENDING)
     def test_follows_all_comment_pages(self, monkeypatch):
         page1 = [{"id": i, "body": f"c{i}"} for i in range(30)]
         page2 = [{"id": 30, "body": "c30"}]
@@ -101,7 +96,6 @@ class TestPagination:
 # Comment update: the PATCH path for in-place plan amendment
 # --------------------------------------------------------------------------
 class TestUpdateComment:
-    @pytest.mark.skip(reason=PENDING)
     def test_issues_a_patch_to_the_comment_endpoint(self, monkeypatch):
         seen = {}
 
@@ -124,7 +118,6 @@ class TestUpdateComment:
 # Architectural: the pure core must not import the network
 # --------------------------------------------------------------------------
 class TestCorePurity:
-    @pytest.mark.skip(reason=PENDING)
     def test_core_source_imports_no_network_modules(self):
         """ctx_core stays pure — no urllib/subprocess/requests/http imports."""
         source = pathlib_read(ctx_core.__file__)
