@@ -49,13 +49,20 @@ class TestParseInline:
 
 
 # --------------------------------------------------------------------------
-# Grammar: the emoji is the canonical match token (prose-collision guard)
+# Grammar: the full emoji+keyword+: triple is the canonical match token
+# (prose-collision guard — neither half registers on its own)
 # --------------------------------------------------------------------------
-class TestEmojiIsCanonical:
+class TestTripleIsCanonical:
     def test_bare_keyword_in_prose_does_not_register(self):
         """"...this is part of the wider effort..." is prose, not a marker."""
         parsed = ctx_core.parse("This is part of: the wider effort here.\n")
         assert parsed.markers == []
+
+    def test_bare_emoji_without_keyword_does_not_register(self):
+        """A leading ✅/❓ without its keyword is prose — a tick, a rhetorical Q."""
+        assert ctx_core.parse("✅ done the dishes\n").markers == []
+        assert ctx_core.parse("❓ why is this so slow?\n").markers == []
+        assert ctx_core.parse("🔒 the door is locked\n").markers == []
 
     def test_emoji_mid_sentence_does_not_register(self):
         """An emoji not at line-start is prose decoration, not a marker."""

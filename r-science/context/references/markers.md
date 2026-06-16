@@ -8,14 +8,19 @@ bodies throughout this project.  `ctx_core.py` implements this grammar.  `#18`
 
 ## Design principles
 
-**The emoji is the canonical match token.**  A marker is recognised by its
-leading emoji glyph, not by its keyword.  "Part-of" written in ordinary prose
-does not register.  The linter never invents an emoji from a bare keyword; it
-flags the omission and asks the human to repair it.
+**The full `emoji + keyword + :` triple is the canonical match token.**  A marker
+registers only when all three appear together, line-anchored and in order
+(e.g. `🧩 Part-of:`).  Requiring *both* halves is deliberate, because each one
+collides with ordinary prose on its own: a bare emoji — ✅, ❓, ⚡ and 🔒 are all
+common in running text — is treated as decoration, and a bare keyword ("Part-of",
+"Future:") is treated as prose too.  The two omissions are handled
+**asymmetrically**: a bare keyword looks like a forgotten sigil, so the linter
+flags it (I8) and asks the human to repair it; a bare emoji is just decoration, so
+it passes silently.  The linter never invents a marker from half a token.
 
-**Line-anchored.**  The emoji must be the first non-whitespace token on its
-line.  An emoji appearing mid-sentence is prose decoration.  Indentation
-(leading spaces or tabs) is allowed.
+**Line-anchored.**  The triple must begin at the first non-whitespace token on its
+line (that token is the emoji).  A marker appearing mid-sentence is prose
+decoration.  Indentation (leading spaces or tabs) is allowed.
 
 **Quoting ≠ asserting.**  Markers inside fenced code blocks (` ``` `) do not
 register.  A standalone blockquote — one that is not immediately preceded by an
