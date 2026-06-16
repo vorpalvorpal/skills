@@ -84,9 +84,9 @@ def inline_markers_text():
 
 @pytest.fixture
 def block_dead_end_text():
-    """A block-form Dead-end: empty inline value, value is the blockquote."""
+    """A block-form keyed Dead-end: id inline, body in the blockquote."""
     return (
-        "🪦 Dead-end:\n"
+        "🪦 Dead-end: #7.de1\n"
         "> Tried FFT-based convolution. Padding to next pow2 dominated\n"
         "> cost at n<512; the direct loop was 3x faster in that regime.\n"
         "\n"

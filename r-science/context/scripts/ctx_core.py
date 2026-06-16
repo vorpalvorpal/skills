@@ -7,7 +7,8 @@ Public API
 ----------
 Kind constants (str):
     PART_OF, ASPECT, BOUNDARY, BLOCKED_BY, DESIGN, EQ, CITES, DEAD_END,
-    CONFIDENCE, FIDELITY, SEAL, QUESTION, VALIDATION, ALTERNATIVE, FUTURE, OPT
+    CONFIDENCE, FIDELITY, SEAL, QUESTION, VALIDATION, ALTERNATIVE, FUTURE, OPT,
+    ARTEFACT
 
 Dataclasses:
     Marker(kind, value, line)
@@ -53,6 +54,7 @@ VALIDATION = "validation"
 ALTERNATIVE = "alternative"
 FUTURE = "future"
 OPT = "opt"
+ARTEFACT = "artefact"
 
 # ---------------------------------------------------------------------------
 # Glyph vocabulary
@@ -86,6 +88,7 @@ _G_VALIDATION  = _norm("✅")
 _G_ALTERNATIVE = _norm("⚖️")
 _G_FUTURE      = _norm("🔮")
 _G_OPT         = _norm("⚡")
+_G_ARTEFACT    = _norm("🗄️")
 
 
 def _parse_issue_list(raw: str, line: int) -> tuple[list[int] | None, Finding | None]:
@@ -157,6 +160,8 @@ KEYED: dict = {
     ALTERNATIVE: ("alt", "proposed", frozenset({"proposed", "rejected", "viable", "chosen"})),
     FUTURE:      ("fd",  "declared", frozenset({"declared", "activated", "dropped"})),
     OPT:         ("opt", "declared", frozenset({"declared", "done", "dropped"})),
+    DEAD_END:    ("de",  "closed",   frozenset({"closed", "revived"})),
+    ARTEFACT:    ("art", "live",     frozenset({"live", "stale"})),
 }
 
 _WS_SPLIT = re.compile(r"^(\S+)\s*(.*)$", re.DOTALL)
@@ -188,6 +193,22 @@ def _make_keyed_parser(prefix: str, default_status: str, status_set: frozenset) 
     return parser
 
 
+def _keyed_inline_is_id_only(inline: str, status_set: frozenset) -> bool:
+    """True if `inline` is just an id (optionally + a status word), no further text.
+
+    Used to decide whether an immediately-following blockquote is the keyed
+    marker's body.
+    """
+    mid = _WS_SPLIT.match(inline)
+    if not mid:
+        return False
+    rest = mid.group(2)
+    if not rest:
+        return True
+    mst = _WS_SPLIT.match(rest)
+    return bool(mst and mst.group(1) in status_set and not mst.group(2).strip())
+
+
 # Table: (normalised_glyph, keyword_regex, kind, parser, is_block_only)
 # keyword_regex is case-insensitive and matched after the glyph.
 _VOCAB: list[tuple[str, str, str, Callable, bool]] = [
@@ -198,7 +219,7 @@ _VOCAB: list[tuple[str, str, str, Callable, bool]] = [
     (_G_DESIGN,   r"Design",    DESIGN,    _parse_single_issue,False),
     (_G_EQ,       r"Eq",        EQ,        _parse_str,         False),
     (_G_CITES,    r"Cites",     CITES,     _parse_cite_list,   False),
-    (_G_DEAD_END, r"Dead-end",  DEAD_END,  _parse_str,         True),  # block only
+    (_G_DEAD_END, r"Dead-end",  DEAD_END,  _make_keyed_parser(*KEYED[DEAD_END]),       False),
     (_G_CONFIDENCE, r"Confidence", CONFIDENCE, _parse_enum(_CONFIDENCE_SET, "Confidence"), False),
     (_G_FIDELITY,   r"Fidelity",   FIDELITY,   _parse_enum(_FIDELITY_SET, "Fidelity"),     False),
     (_G_SEAL,       r"Seal",       SEAL,       _parse_seal,                                False),
@@ -207,6 +228,7 @@ _VOCAB: list[tuple[str, str, str, Callable, bool]] = [
     (_G_ALTERNATIVE, r"Alternative", ALTERNATIVE, _make_keyed_parser(*KEYED[ALTERNATIVE]), False),
     (_G_FUTURE,      r"Future",      FUTURE,      _make_keyed_parser(*KEYED[FUTURE]),      False),
     (_G_OPT,         r"Optimisation",OPT,         _make_keyed_parser(*KEYED[OPT]),         False),
+    (_G_ARTEFACT,    r"Artefact",    ARTEFACT,    _make_keyed_parser(*KEYED[ARTEFACT]),    False),
 ]
 
 # Bare keyword patterns for I8 (sigil-less line detection)
@@ -381,6 +403,24 @@ for _entry in _VOCAB:
 
 
 
+def _consume_blockquote(lines: list, i: int) -> tuple:
+    """Collect consecutive `>` lines from index i (one space after `>` stripped).
+
+    Returns (joined_text, new_index).
+    """
+    block_lines = []
+    while i < len(lines):
+        bl_stripped = lines[i].lstrip()
+        if not bl_stripped.startswith(">"):
+            break
+        content = bl_stripped[1:]
+        if content.startswith(" "):
+            content = content[1:]
+        block_lines.append(content)
+        i += 1
+    return "\n".join(block_lines), i
+
+
 def parse(text: str) -> Parsed:
     """Parse issue body text into markers and findings.
 
@@ -439,29 +479,25 @@ def parse(text: str) -> Parsed:
             if m is None:
                 continue
 
-            # Verify the emoji is the first non-whitespace token.
-            # The regex already anchors to ^[ \t]* so if it matches, emoji is first.
+            # The regex anchors to ^[ \t]*, so a match means the emoji is the
+            # first non-whitespace token on the line.
             matched = True
             raw_value = m.group("value").strip()
+            i += 1
 
-            # Block form (any marker): an empty inline value means the value is
-            # the immediately-following blockquote.  Otherwise it is inline. The
-            # kind's own parser runs on the resulting text either way.
-            if not raw_value:
-                i += 1
-                block_lines = []
-                while i < len(lines):
-                    bl_stripped = lines[i].lstrip()
-                    if not bl_stripped.startswith(">"):
-                        break
-                    content = bl_stripped[1:]
-                    if content.startswith(" "):
-                        content = content[1:]
-                    block_lines.append(content)
-                    i += 1
-                raw_value = "\n".join(block_lines)
-            else:
-                i += 1
+            if kind in KEYED:
+                # Keyed markers carry an id inline; block form triggers when the
+                # inline value is just the id (+ optional status) and a blockquote
+                # immediately follows — its body becomes the keyed text.
+                _, _, status_set = KEYED[kind]
+                if _keyed_inline_is_id_only(raw_value, status_set):
+                    blocktext, i = _consume_blockquote(lines, i)
+                    if blocktext:
+                        raw_value = f"{raw_value}\n{blocktext}" if raw_value else blocktext
+            elif not raw_value:
+                # Non-keyed block form: empty inline value ⇒ value is the
+                # immediately-following blockquote.
+                raw_value, i = _consume_blockquote(lines, i)
 
             value, err = parser(raw_value, lineno)
             if err is not None:
@@ -500,6 +536,7 @@ _KIND_TO_KW: dict[str, str] = {
     ALTERNATIVE: "Alternative",
     FUTURE:      "Future",
     OPT:         "Optimisation",
+    ARTEFACT:    "Artefact",
 }
 
 # Glyph for rendering (normalised, no trailing FE0F).
@@ -520,17 +557,12 @@ _KIND_TO_GLYPH: dict[str, str] = {
     ALTERNATIVE: _G_ALTERNATIVE,
     FUTURE:      _G_FUTURE,
     OPT:         _G_OPT,
+    ARTEFACT:    _G_ARTEFACT,
 }
 
 
 def _render_value(kind: str, value: object) -> str:
-    """Render a marker value to its string representation."""
-    if kind in KEYED:
-        assert isinstance(value, Keyed)
-        parts = [value.id, value.status]   # status always emitted ⇒ unambiguous round-trip
-        if value.text:
-            parts.append(value.text)
-        return " ".join(parts)
+    """Render a non-keyed marker value to its string representation."""
     if kind in (PART_OF, BOUNDARY, BLOCKED_BY):
         # list[int] → "#16, #17"
         assert isinstance(value, list)
@@ -553,14 +585,25 @@ def _render_value(kind: str, value: object) -> str:
 def render(marker: Marker) -> str:
     """Render a Marker to a string that parse() will round-trip exactly.
 
-    Block form (emoji + keyword + blockquote) is used when the value is
-    multi-line, or for DEAD_END (canonically block); inline form otherwise.
+    Keyed markers emit their id and status inline (status is always present, so
+    the round-trip is unambiguous); multi-line text goes to a blockquote with the
+    id kept inline. Non-keyed multi-line values use plain block form.
     """
     glyph = _KIND_TO_GLYPH[marker.kind]
     kw = _KIND_TO_KW[marker.kind]
-    val_str = _render_value(marker.kind, marker.value)
 
-    if marker.kind == DEAD_END or "\n" in val_str:
+    if marker.kind in KEYED:
+        kv = marker.value
+        head = f"{kv.id} {kv.status}"
+        if "\n" in kv.text:
+            block = "\n".join(f"> {line}" for line in kv.text.split("\n"))
+            return f"{glyph} {kw}: {head}\n{block}\n"
+        if kv.text:
+            return f"{glyph} {kw}: {head} {kv.text}\n"
+        return f"{glyph} {kw}: {head}\n"
+
+    val_str = _render_value(marker.kind, marker.value)
+    if "\n" in val_str:
         block = "\n".join(f"> {line}" for line in val_str.split("\n"))
         return f"{glyph} {kw}:\n{block}\n"
     return f"{glyph} {kw}: {val_str}\n"
@@ -873,6 +916,12 @@ def _check_i8(model: Model, platform: Platform) -> list:
                     # However, we need to ensure the emoji-form regex does NOT also match.
                     emoji_pat = _MARKER_RE[kind]
                     if not emoji_pat.match(line):
+                        # Keyed kinds use common English keywords; only flag a
+                        # missing sigil when an id actually follows (else it's
+                        # ordinary prose, not a sigil-less marker).
+                        bare_end = pat.match(stripped).end()
+                        if kind in KEYED and not re.match(r"#\d+\.[a-z]+\d+", stripped[bare_end:]):
+                            break
                         findings.append(Finding(
                             issue, "I8",
                             f"line {lineno}: bare keyword '{kw}:' without emoji sigil",

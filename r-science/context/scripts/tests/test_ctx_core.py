@@ -85,17 +85,18 @@ class TestNormalisation:
 # --------------------------------------------------------------------------
 class TestParseBlock:
     def test_block_value_is_the_following_blockquote(self, block_dead_end_text):
-        """Empty inline value ⇒ value is the consecutive `>` lines."""
+        """Keyed Dead-end: id inline, the consecutive `>` lines are the text."""
         markers = ctx_core.parse(block_dead_end_text).markers
         assert len(markers) == 1
         assert markers[0].kind == ctx_core.DEAD_END
-        assert "FFT-based convolution" in markers[0].value
-        assert "3x faster" in markers[0].value
+        assert markers[0].value.id == "#7.de1"
+        assert "FFT-based convolution" in markers[0].value.text
+        assert "3x faster" in markers[0].value.text
 
     def test_block_terminates_at_first_non_blockquote_line(self, block_dead_end_text):
-        """Prose after the blockquote is not swallowed into the marker value."""
+        """Prose after the blockquote is not swallowed into the marker text."""
         value = ctx_core.parse(block_dead_end_text).markers[0].value
-        assert "Back to prose" not in value
+        assert "Back to prose" not in value.text
 
     def test_block_form_works_for_eq_multiline_latex(self):
         """Block form is general: Eq accepts a multi-line LaTeX value."""
@@ -156,8 +157,9 @@ class TestRoundTrip:
         assert ctx_core.parse(ctx_core.render(m)).markers == [m]
 
     def test_block_form_round_trips(self):
-        """A multi-line Dead-end survives render→parse unchanged."""
-        m = ctx_core.Marker(ctx_core.DEAD_END, "line one\nline two", 1)
+        """A multi-line keyed Dead-end survives render→parse unchanged."""
+        m = ctx_core.Marker(ctx_core.DEAD_END,
+                            ctx_core.Keyed("#7.de1", "closed", "line one\nline two"), 1)
         assert ctx_core.parse(ctx_core.render(m)).markers == [m]
 
     def test_round_trip_survives_normalisation(self):
@@ -222,7 +224,7 @@ class TestCollate:
         """Dead-end scope = the node whose thread carries it (#22); grouped by subtree."""
         nodes = [
             ctx_core.Node(16, "root\n", "open", None, set()),
-            ctx_core.Node(17, "🧩 Part-of: #16\n🪦 Dead-end:\n> tried X, slow\n",
+            ctx_core.Node(17, "🧩 Part-of: #16\n🪦 Dead-end: #17.de1\n> tried X, slow\n",
                           "open", None, set()),
         ]
         model = ctx_core.collate(nodes)
