@@ -201,18 +201,15 @@ class TestI8:
 # CLI — exit codes and finding format
 # --------------------------------------------------------------------------
 class TestLinterCLI:
-    @pytest.mark.skip(reason=CLI)
     def test_exit_zero_when_clean(self):
         ctx_lint = pytest.importorskip("ctx_lint")
         assert ctx_lint.exit_code([]) == 0
 
-    @pytest.mark.skip(reason=CLI)
     def test_exit_one_on_findings(self):
         ctx_lint = pytest.importorskip("ctx_lint")
         findings = [ctx_core.Finding(17, "I3", "cycle through #16", "finding")]
         assert ctx_lint.exit_code(findings) == 1
 
-    @pytest.mark.skip(reason=CLI)
     def test_info_and_warning_do_not_flip_exit_code(self):
         ctx_lint = pytest.importorskip("ctx_lint")
         findings = [
@@ -221,7 +218,6 @@ class TestLinterCLI:
         ]
         assert ctx_lint.exit_code(findings) == 0
 
-    @pytest.mark.skip(reason=CLI)
     def test_finding_renders_as_issue_key_detail(self):
         f = ctx_core.Finding(17, "I3", "cycle through #16", "finding")
         assert str(f) == "#17:I3:cycle through #16"
