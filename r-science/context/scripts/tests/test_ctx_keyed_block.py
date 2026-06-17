@@ -77,8 +77,8 @@ class TestI8ProseGuard:
         assert self._i8("Future: we might revisit this later\n") == []
 
     def test_bare_keyed_marker_with_id_is_flagged(self):
-        """`Future: #16.fd1 …` without the 🔮 sigil is a missing-sigil finding."""
-        assert any(f.key == "I8" for f in self._i8("Future: #16.fd1 nonparametric\n"))
+        """`Future: #16.fut1 …` without the 🔮 sigil is a missing-sigil finding."""
+        assert any(f.key == "I8" for f in self._i8("Future: #16.fut1 expansion\n"))
 
     def test_non_keyed_bare_keyword_still_flagged(self):
         """Non-keyed bare keywords keep the original I8 behaviour."""

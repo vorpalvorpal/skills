@@ -27,7 +27,7 @@ class TestKeyedFold:
         assert alts == [(16, C.Keyed("#16.alt1", "viable", "data is uncensored"))]
 
     def test_distinct_ids_both_present(self):
-        node = _node(16, "🔮 Future: #16.fd1 declared A\n🔮 Future: #16.fd2 declared B\n")
+        node = _node(16, "🔮 Future: #16.fut1 declared A\n🔮 Future: #16.fut2 declared B\n")
         model = C.collate([node])
         assert len(model.registries[C.FUTURE]) == 2
 

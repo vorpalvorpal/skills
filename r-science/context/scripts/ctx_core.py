@@ -7,8 +7,10 @@ Public API
 ----------
 Kind constants (str):
     PART_OF, ASPECT, BOUNDARY, BLOCKED_BY, DESIGN, EQ, CITES, DEAD_END,
-    CONFIDENCE, FIDELITY, SEAL, QUESTION, VALIDATION, ALTERNATIVE, FUTURE, OPT,
-    ARTEFACT
+    CONFIDENCE, FIDELITY, SEAL, QUESTION, VALIDATION, ALTERNATIVE, FUTURE, REFINE,
+    OPT, ARTEFACT
+    (FUTURE = expansion, prefix `fut`, optional [v<n>] tag; REFINE = correctness-bearing
+     accuracy lever, prefix `fd`; OPT = speed lever, prefix `opt`.)
 
 Dataclasses:
     Marker(kind, value, line)
@@ -53,6 +55,7 @@ QUESTION = "question"
 VALIDATION = "validation"
 ALTERNATIVE = "alternative"
 FUTURE = "future"
+REFINE = "refine"
 OPT = "opt"
 ARTEFACT = "artefact"
 PRO = "pro"
@@ -89,6 +92,7 @@ _G_QUESTION    = _norm("❓")
 _G_VALIDATION  = _norm("✅")
 _G_ALTERNATIVE = _norm("⚖️")
 _G_FUTURE      = _norm("🔮")
+_G_REFINE      = _norm("🎯")
 _G_OPT         = _norm("⚡")
 _G_ARTEFACT    = _norm("🗄️")
 _G_PRO         = _norm("➕")
@@ -162,7 +166,11 @@ KEYED: dict = {
     QUESTION:    ("q",   "open",     frozenset({"open", "answered"})),
     VALIDATION:  ("v",   "open",     frozenset({"open", "met", "unmet"})),
     ALTERNATIVE: ("alt", "proposed", frozenset({"proposed", "rejected", "viable", "chosen"})),
-    FUTURE:      ("fd",  "declared", frozenset({"declared", "activated", "dropped"})),
+    # FUTURE = expansion (niceness / new child); carries an optional [v<n>] version tag.
+    FUTURE:      ("fut", "declared", frozenset({"declared", "activated", "dropped"})),
+    # REFINE = the correctness-bearing accuracy lever (contingent; "if our approximation
+    # proves inadequate, here is a more-exact one"). Reviewed against the gestalt post-correct.
+    REFINE:      ("fd",  "declared", frozenset({"declared", "activated", "dropped"})),
     OPT:         ("opt", "declared", frozenset({"declared", "done", "dropped"})),
     DEAD_END:    ("de",  "closed",   frozenset({"closed", "revived"})),
     ARTEFACT:    ("art", "live",     frozenset({"live", "stale"})),
@@ -174,16 +182,27 @@ KEYED: dict = {
 
 _WS_SPLIT = re.compile(r"^(\S+)\s*(.*)$", re.DOTALL)
 
+# A disciplined, optional version tag — only Future (expansion) markers may carry one.
+# `_VER_CLEAN` is the accepted shape `[v<n>]`; `_VER_LOOSE` catches `[v…`-shaped tokens
+# that aren't well-formed so they fail loudly rather than silently becoming text.
+_VER_CLEAN = re.compile(r"\[(v\d+)\](?:\s+|$)")
+_VER_LOOSE = re.compile(r"\[v\d")
+
 
 def _make_keyed_parser(prefix: str, default_status: str, status_set: frozenset,
-                       id_pattern: str | None = None, id_hint: str | None = None) -> Callable:
-    """Build a parser for `<id> [<status>] [<text>]`, id = #<issue>.<prefix><n>.
+                       id_pattern: str | None = None, id_hint: str | None = None,
+                       version: bool = False) -> Callable:
+    """Build a parser for `<id> [<status>] [<version>] [<text>]`, id = #<issue>.<prefix><n>.
 
     The id's prefix must match this kind. An unrecognised second token is text,
     not status (the default status then applies). Returns a Keyed value.
 
     `id_pattern`/`id_hint` override the default id shape — used by Pro/Con, whose
     ids carry an extra option segment (#<issue>.<opt><n>.p<n>).
+
+    `version=True` (Future markers only) permits an optional `[v<n>]` tag between the
+    status and the text. A version tag on a non-version kind, or a malformed one, is a
+    Finding — the tag is a query selector for the release gate, so it must be disciplined.
     """
     id_re = re.compile(id_pattern or rf"^#\d+\.{prefix}\d+$")
     hint = id_hint or f"#<issue>.{prefix}<n>"
@@ -201,7 +220,20 @@ def _make_keyed_parser(prefix: str, default_status: str, status_set: frozenset,
         mst = _WS_SPLIT.match(rest)
         if mst and mst.group(1) in status_set:
             status, text = mst.group(1), mst.group(2)
-        return Keyed(idtok, status, text.strip()), None
+
+        ver = None
+        mvc = _VER_CLEAN.match(text)
+        if mvc:
+            if not version:
+                return None, Finding(0, "parse",
+                                     f"version tag [{mvc.group(1)}] only allowed on Future markers",
+                                     line=line)
+            ver, text = mvc.group(1), text[mvc.end():]
+        elif _VER_LOOSE.match(text):
+            return None, Finding(0, "parse",
+                                 f"malformed version tag in {text!r}; expected [v<n>]", line=line)
+
+        return Keyed(idtok, status, text.strip(), ver), None
 
     return parser
 
@@ -239,7 +271,8 @@ _VOCAB: list[tuple[str, str, str, Callable, bool]] = [
     (_G_QUESTION,    r"Question",    QUESTION,    _make_keyed_parser(*KEYED[QUESTION]),    False),
     (_G_VALIDATION,  r"Validation",  VALIDATION,  _make_keyed_parser(*KEYED[VALIDATION]),  False),
     (_G_ALTERNATIVE, r"Alternative", ALTERNATIVE, _make_keyed_parser(*KEYED[ALTERNATIVE]), False),
-    (_G_FUTURE,      r"Future",      FUTURE,      _make_keyed_parser(*KEYED[FUTURE]),      False),
+    (_G_FUTURE,      r"Future",      FUTURE,      _make_keyed_parser(*KEYED[FUTURE], version=True), False),
+    (_G_REFINE,      r"Refinement",  REFINE,      _make_keyed_parser(*KEYED[REFINE]),      False),
     (_G_OPT,         r"Optimisation",OPT,         _make_keyed_parser(*KEYED[OPT]),         False),
     (_G_ARTEFACT,    r"Artefact",    ARTEFACT,    _make_keyed_parser(*KEYED[ARTEFACT]),    False),
     (_G_PRO, r"Pro", PRO, _make_keyed_parser("p", "standing", KEYED[PRO][2],
@@ -264,6 +297,7 @@ class Keyed:
     id: str
     status: str
     text: str
+    version: str | None = None   # Future markers only: e.g. "v1" (the release-gate selector)
 
 
 @dataclass
@@ -575,6 +609,7 @@ _KIND_TO_KW: dict[str, str] = {
     VALIDATION:  "Validation",
     ALTERNATIVE: "Alternative",
     FUTURE:      "Future",
+    REFINE:      "Refinement",
     OPT:         "Optimisation",
     ARTEFACT:    "Artefact",
     PRO:         "Pro",
@@ -598,6 +633,7 @@ _KIND_TO_GLYPH: dict[str, str] = {
     VALIDATION:  _G_VALIDATION,
     ALTERNATIVE: _G_ALTERNATIVE,
     FUTURE:      _G_FUTURE,
+    REFINE:      _G_REFINE,
     OPT:         _G_OPT,
     ARTEFACT:    _G_ARTEFACT,
     PRO:         _G_PRO,
@@ -639,6 +675,8 @@ def render(marker: Marker) -> str:
     if marker.kind in KEYED:
         kv = marker.value
         head = f"{kv.id} {kv.status}"
+        if getattr(kv, "version", None):
+            head += f" [{kv.version}]"
         if "\n" in kv.text:
             block = "\n".join(f"> {line}" for line in kv.text.split("\n"))
             return f"{glyph} {kw}: {head}\n{block}\n"

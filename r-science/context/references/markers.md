@@ -82,7 +82,8 @@ Use for multi-line prose, LaTeX `align` blocks, and rationale text.
 | ❓ | `Question:` | keyed `q` → `Keyed` | inline / block |
 | ✅ | `Validation:` | keyed `v` → `Keyed` | inline / block |
 | ⚖️ | `Alternative:` | keyed `alt` → `Keyed` | inline / block |
-| 🔮 | `Future:` | keyed `fd` → `Keyed` | inline / block |
+| 🔮 | `Future:` | keyed `fut` → `Keyed` (optional `[v<n>]`) | inline / block |
+| 🎯 | `Refinement:` | keyed `fd` → `Keyed` | inline / block |
 | ⚡ | `Optimisation:` | keyed `opt` → `Keyed` | inline / block |
 | 🪦 | `Dead-end:` | keyed `de` → `Keyed` | inline / block |
 | 🗄️ | `Artefact:` | keyed `art` → `Keyed` | inline / block |
@@ -111,7 +112,8 @@ a later comment supersedes an earlier one by id (the fold; see `context-spec.md`
 | `Question` | `q` | `open` → `answered` |
 | `Validation` | `v` | `open` → `met` / `unmet` |
 | `Alternative` | `alt` | `proposed` → `rejected` / `viable` / `chosen` |
-| `Future` | `fd` | `declared` → `activated` / `dropped` |
+| `Future` | `fut` | `declared` → `activated` / `dropped` |
+| `Refinement` | `fd` | `declared` → `activated` / `dropped` |
 | `Optimisation` | `opt` | `declared` → `done` / `dropped` |
 | `Dead-end` | `de` | `closed` → `revived` |
 | `Artefact` | `art` | `live` → `stale` |
@@ -129,6 +131,42 @@ a later comment supersedes an earlier one by id (the fold; see `context-spec.md`
 
 I8 flags a sigil-less keyed keyword (e.g. `Future:`) only when an id follows it,
 so ordinary prose beginning with such a word is not a false positive.
+
+## Deferred work: Future / Refinement / Optimisation (#33)
+
+Three keyed registers hold work that is **not** an open child. (Anything load-bearing
+for the current sweep is an open `Part-of` child instead — there is no "load-bearing"
+flag; the fold is `min` over open + closed-completed children + own glue.)
+
+| Marker | Means | Bears on *this node's* correctness? |
+|--------|-------|-------------------------------------|
+| 🎯 `Refinement` (`fd`) | a **contingent accuracy lever** — "we made a reasonable approximation; *if* it proves inadequate, here is a more-exact one" (e.g. gaussian → non-parametric SSD) | **yes** — pulled only on gestalt review |
+| ⚡ `Optimisation` (`opt`) | a **contingent speed lever** — pulled only if speed proves inadequate | no (speed, not correctness) |
+| 🔮 `Future` (`fut`) | an **expansion** — makes the node nicer, or spawns a child with its own correctness (e.g. a coefficient summary table; a section image) | no |
+
+Classification rule for the grey zone:
+
+- correctness-bearing **and** only-pull-on-gestalt-review → **`Refinement`**
+- nicer, actually planned → **`Future` with a version tag**
+- nicer, no present plan → **bare `Future`**
+
+### Version tag `[v<n>]` (Future only)
+
+A `Future` marker may carry an optional, disciplined version tag between the status and
+the text — `🔮 Future: #16.fut1 declared [v1] cli message about generated warnings`. It is
+a **query selector** for the release gate, so it is strict: only `[v<n>]` is accepted;
+a malformed tag (`[v1.0]`) or a tag on any non-`Future` marker is a parse finding. The
+tag is **optional** — omit it for speculative "someday" items. A whole dormant *node*
+that is planned for a version carries the same intent as a `v<n>` label (a derived
+index, not parsed here).
+
+### Two thresholds
+
+- **`correct`** — the fidelity fold above (load-bearing children done + own glue); a
+  per-node property.
+- **`release-ready`** — `correct` **plus** the `opt`/`fd` levers gestalt-reviewed and the
+  version-tagged `Future`s triaged (add-or-defer). "Add" promotes a future via the node
+  inline/dormant threshold and may transiently drop a node below `correct` by design.
 
 ## Pros & cons (sub-keyed under an option)
 
