@@ -1,0 +1,118 @@
+"""Behaviour spec for the scheduler analytical core (#32 / D-core).
+
+Pure functions over a collated Model: the four axes (fidelity fold, confidence,
+centrality, priority) and the floor-first → best-first node selection.
+"""
+import pytest
+
+ctx_core = pytest.importorskip("ctx_core")
+ctx_schedule = pytest.importorskip("ctx_schedule")
+C = ctx_core
+
+
+def N(num, body, state="open", reason=None, labels=()):
+    return C.Node(num, body, state, reason, set(labels))
+
+
+def _model(nodes):
+    return C.collate(nodes)
+
+
+# --- fidelity fold ----------------------------------------------------------
+class TestEffectiveFidelity:
+    def test_parent_folds_to_min_over_children(self):
+        m = _model([
+            N(1, "# r\n📊 Fidelity: correct\n"),
+            N(2, "🧩 Part-of: #1\n📊 Fidelity: mock\n"),
+            N(3, "🧩 Part-of: #1\n📊 Fidelity: interface\n"),
+        ])
+        eff = ctx_schedule.effective_fidelity(m)
+        assert eff[1] == "interface"                 # min(correct, mock, interface)
+        assert eff[2] == "mock" and eff[3] == "interface"   # leaves = own
+
+    def test_dormant_child_excluded_from_fold(self):
+        m = _model([
+            N(1, "# r\n📊 Fidelity: correct\n"),
+            N(2, "🧩 Part-of: #1\n📊 Fidelity: stub\n", state="closed", labels=("dormant",)),
+        ])
+        assert ctx_schedule.effective_fidelity(m)[1] == "correct"   # dormant stub ignored
+
+
+# --- confidence -------------------------------------------------------------
+class TestConfidence:
+    def test_derived_from_qv_overrides_declared(self):
+        m = _model([N(1, "# r\n🧭 Confidence: high\n"
+                         "❓ Question: #1.q1 answered\n❓ Question: #1.q2 open\n")])
+        assert ctx_schedule.confidence_label(m, 1) == "tentative"   # 1/2 resolved
+
+    def test_falls_back_to_declared_marker_without_qv(self):
+        m = _model([N(1, "# r\n🧭 Confidence: high\n")])
+        assert ctx_schedule.confidence_label(m, 1) == "high"
+        assert ctx_schedule.confidence_value(m, 1) == 1.0
+
+    def test_defaults_low(self):
+        assert ctx_schedule.confidence_label(_model([N(1, "# r\n")]), 1) == "low"
+
+
+# --- centrality / priority --------------------------------------------------
+class TestCentrality:
+    def test_counts_descendants_boundary_blocked_and_aspects(self):
+        m = _model([
+            N(1, "# r\n"),
+            N(2, "🧩 Part-of: #1\n🧱 Boundary: #3\n⛔ Blocked-by: #3\n🏷️ aspect: x\n"),
+            N(3, "🧩 Part-of: #2\n"),
+        ])
+        cen = ctx_schedule.centrality(m)
+        assert cen[1] == 2     # 2 descendants (#2, #3)
+        assert cen[2] == 2     # 1 descendant (#3) + 1 aspect
+        assert cen[3] == 2     # boundary-in 1 + blocked-in 1 from #2
+
+    def test_priority_is_centrality_times_one_minus_confidence(self):
+        m = _model([N(1, "# r\n🧭 Confidence: low\n"), N(2, "🧩 Part-of: #1\n")])
+        assert ctx_schedule.priority(m)[1] == 1.0     # centrality 1 × (1 − 0)
+
+
+# --- frontier / floor / selection -------------------------------------------
+class TestSelection:
+    def test_frontier_excludes_closed_and_dormant(self):
+        m = _model([
+            N(1, "# r\n"),
+            N(2, "🧩 Part-of: #1\n", state="closed", reason="completed"),
+            N(3, "🧩 Part-of: #1\n", state="closed", labels=("dormant",)),
+        ])
+        assert ctx_schedule.frontier(m) == {1}
+
+    def test_floor_not_met_with_a_stub(self):
+        m = _model([N(1, "# r\n📊 Fidelity: interface\n"),
+                    N(2, "🧩 Part-of: #1\n📊 Fidelity: stub\n")])
+        assert ctx_schedule.floor_met(m) is False
+
+    def test_floor_met_when_all_at_least_interface(self):
+        m = _model([N(1, "# r\n📊 Fidelity: interface\n"),
+                    N(2, "🧩 Part-of: #1\n📊 Fidelity: mock\n")])
+        assert ctx_schedule.floor_met(m) is True
+
+    def test_floor_first_picks_shallowest_sub_interface_node(self):
+        m = _model([N(1, "# r\n📊 Fidelity: stub\n"),
+                    N(2, "🧩 Part-of: #1\n📊 Fidelity: stub\n")])
+        assert ctx_schedule.next_node(m) == 1     # root is shallowest
+
+    def test_best_first_picks_max_priority_when_floor_met(self):
+        m = _model([
+            N(1, "# r\n📊 Fidelity: interface\n🧭 Confidence: high\n"),
+            N(2, "🧩 Part-of: #1\n📊 Fidelity: interface\n🧭 Confidence: low\n"
+                 "🏷️ aspect: a\n🏷️ aspect: b\n"),
+        ])
+        assert ctx_schedule.next_node(m) == 2     # higher centrality, lower confidence
+
+    def test_skips_excluded_and_pins_forced(self):
+        m = _model([
+            N(1, "# r\n📊 Fidelity: interface\n🧭 Confidence: low\n🏷️ aspect: a\n"),
+            N(2, "🧩 Part-of: #1\n📊 Fidelity: interface\n🧭 Confidence: low\n"),
+        ])
+        assert ctx_schedule.next_node(m, skips=[1]) == 2   # #1 outranks but is skipped
+        assert ctx_schedule.next_node(m, pins=[2]) == 2    # pin forces #2
+
+    def test_empty_frontier_returns_none(self):
+        m = _model([N(1, "# r\n", state="closed", reason="completed")])
+        assert ctx_schedule.next_node(m) is None
