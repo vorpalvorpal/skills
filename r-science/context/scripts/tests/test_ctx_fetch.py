@@ -124,6 +124,75 @@ class TestUpdateComment:
 
 
 # --------------------------------------------------------------------------
+# Write path: create_issue / add_comment, lint-before-post, best-effort linking
+# --------------------------------------------------------------------------
+class TestWritePath:
+    def test_validation_blocks_malformed_marker_before_posting(self, monkeypatch):
+        posted = []
+        monkeypatch.setattr(ctx_fetch, "_has_gh", lambda: True)
+        monkeypatch.setattr(ctx_fetch, "_gh_json",
+                            lambda args: posted.append(args) or {"number": 1, "id": 1})
+        with pytest.raises(ctx_fetch.ValidationError) as exc:
+            ctx_fetch.create_issue("o/r", "T", "📊 Fidelity: banana\n")
+        assert "banana" in str(exc.value)     # the finding names the bad marker
+        assert posted == []                   # nothing reached the transport
+
+    def test_create_issue_via_gh_returns_number(self, monkeypatch):
+        monkeypatch.setattr(ctx_fetch, "_has_gh", lambda: True)
+        monkeypatch.setattr(ctx_fetch, "_gh_json", lambda args: {"number": 99, "id": 555})
+        assert ctx_fetch.create_issue("o/r", "Node", "🧩 Part-of: #16\nbody.\n") == 99
+
+    def test_create_issue_via_rest_fallback(self, monkeypatch):
+        monkeypatch.setattr(ctx_fetch, "_has_gh", lambda: False)
+        monkeypatch.setattr(ctx_fetch, "_token", lambda: "ghp_x")
+        monkeypatch.setattr(ctx_fetch, "_http_json",
+                            lambda url, **kw: (201, {}, {"number": 42, "id": 7}))
+        assert ctx_fetch.create_issue("o/r", "Node", "plain body.\n") == 42
+
+    def test_create_issue_links_subissue_best_effort(self, monkeypatch):
+        seen = []
+        monkeypatch.setattr(ctx_fetch, "_has_gh", lambda: True)
+        monkeypatch.setattr(ctx_fetch, "_gh_json",
+                            lambda args: seen.append(args) or {"number": 99, "id": 555})
+        ctx_fetch.create_issue("o/r", "Node", "🧩 Part-of: #16\n", parent=16)
+        link = [a for a in seen if "sub_issues" in " ".join(a)]
+        assert link, "expected a best-effort sub-issue link call"
+        assert "sub_issue_id=555" in " ".join(link[0])   # the child db id, typed (-F)
+
+    def test_subissue_link_failure_is_nonfatal(self, monkeypatch):
+        monkeypatch.setattr(ctx_fetch, "_has_gh", lambda: True)
+
+        def gh(args):
+            if "sub_issues" in " ".join(args):
+                raise ctx_fetch.OperationalError("link blew up")
+            return {"number": 99, "id": 555}
+
+        monkeypatch.setattr(ctx_fetch, "_gh_json", gh)
+        # the node is still created even though the derived-index link failed
+        assert ctx_fetch.create_issue("o/r", "N", "🧩 Part-of: #16\n", parent=16) == 99
+
+    def test_add_comment_via_gh_returns_id(self, monkeypatch):
+        monkeypatch.setattr(ctx_fetch, "_has_gh", lambda: True)
+        monkeypatch.setattr(ctx_fetch, "_gh_json", lambda args: {"id": 4242})
+        assert ctx_fetch.add_comment("o/r", 16, "🧭 Confidence: high\n") == 4242
+
+    def test_add_comment_validates_before_posting(self, monkeypatch):
+        posted = []
+        monkeypatch.setattr(ctx_fetch, "_has_gh", lambda: True)
+        monkeypatch.setattr(ctx_fetch, "_gh_json",
+                            lambda args: posted.append(args) or {"id": 1})
+        with pytest.raises(ctx_fetch.ValidationError):
+            ctx_fetch.add_comment("o/r", 16, "❓ Question: #16.q open bad-id\n")
+        assert posted == []
+
+    def test_write_requires_a_transport(self, monkeypatch):
+        monkeypatch.setattr(ctx_fetch, "_has_gh", lambda: False)
+        monkeypatch.setattr(ctx_fetch, "_token", lambda: None)
+        with pytest.raises(ctx_fetch.AuthError):
+            ctx_fetch.create_issue("o/r", "T", "ok body\n")
+
+
+# --------------------------------------------------------------------------
 # Architectural: the pure core must not import the network
 # --------------------------------------------------------------------------
 class TestCorePurity:

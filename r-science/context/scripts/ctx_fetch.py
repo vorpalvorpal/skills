@@ -57,6 +57,14 @@ class OperationalError(FetchError):
     """Retries were exhausted, or an unexpected operational failure occurred."""
 
 
+class ValidationError(FetchError):
+    """Text carries malformed markers; the write was refused before it was posted."""
+
+    def __init__(self, findings):
+        self.findings = list(findings)
+        super().__init__("; ".join(str(f) for f in self.findings) or "invalid markers")
+
+
 # ---------------------------------------------------------------------------
 # Seams (monkeypatched in tests)
 # ---------------------------------------------------------------------------
@@ -207,3 +215,70 @@ def update_comment(repo: str, comment_id: int, body: str):
     url = f"{API}/repos/{repo}/issues/comments/{comment_id}"
     _status, _headers, obj = _http_json(url, method="PATCH", body={"body": body})
     return obj
+
+
+def _validate(text: str) -> None:
+    """Lint-before-post: refuse text whose markers are malformed (parse findings)."""
+    findings = ctx_core.parse(text).findings
+    if findings:
+        raise ValidationError(findings)
+
+
+def create_issue(repo: str, title: str, body: str, *, parent: int | None = None) -> int:
+    """Create a node (issue) after lint-checking `body`; return its number.
+
+    The canonical parent edge is the `🧩 Part-of: #parent` marker in `body` (the
+    MCP derives the tree from markers). When `parent` is given we *also* attempt a
+    best-effort GitHub sub-issue link so the node nests in the UI — that link is a
+    derived index, so its failure is non-fatal.
+    """
+    _validate(body)
+    if _has_gh():
+        obj = _gh_json(["api", "-X", "POST", f"repos/{repo}/issues",
+                        "-f", f"title={title}", "-f", f"body={body}"])
+    elif _token() is not None:
+        _status, _headers, obj = _retrying_http(
+            f"{API}/repos/{repo}/issues", method="POST",
+            body={"title": title, "body": body},
+        )
+    else:
+        raise AuthError("no gh CLI on PATH and no GITHUB_TOKEN/GH_TOKEN set")
+    if parent is not None:
+        _link_subissue(repo, parent, obj.get("id"))
+    return obj["number"]
+
+
+def _link_subissue(repo: str, parent: int, child_id) -> None:
+    """Best-effort GitHub sub-issue link (a derived index; failure is non-fatal).
+
+    Uses the child's database `id` (`-F`, typed integer — the API rejects a string).
+    """
+    if child_id is None:
+        return
+    try:
+        if _has_gh():
+            _gh_json(["api", "-X", "POST",
+                      f"repos/{repo}/issues/{parent}/sub_issues",
+                      "-F", f"sub_issue_id={child_id}"])
+        elif _token() is not None:
+            _http_json(f"{API}/repos/{repo}/issues/{parent}/sub_issues",
+                       method="POST", body={"sub_issue_id": child_id})
+    except FetchError:
+        pass   # the canonical Part-of marker is already in the body
+
+
+def add_comment(repo: str, issue: int, body: str) -> int:
+    """Append a comment to a node after lint-checking `body`; return its id."""
+    _validate(body)
+    if _has_gh():
+        obj = _gh_json(["api", "-X", "POST",
+                        f"repos/{repo}/issues/{issue}/comments",
+                        "-f", f"body={body}"])
+    elif _token() is not None:
+        _status, _headers, obj = _retrying_http(
+            f"{API}/repos/{repo}/issues/{issue}/comments",
+            method="POST", body={"body": body},
+        )
+    else:
+        raise AuthError("no gh CLI on PATH and no GITHUB_TOKEN/GH_TOKEN set")
+    return obj["id"]
