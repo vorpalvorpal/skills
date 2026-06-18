@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What This Repository Is
 
-A collection of Claude Skills for **science-centered R package development** — the `r-science` workflow spine and its supporting skills. Skills are structured markdown files that teach Claude specialized workflows. There is no application code to build, compile, or deploy — the primary artifacts are Markdown files consumed directly by Claude's skill system.
+This repository implements **Doktoreltern** — a risk-first methodology for solo and small-scale technical projects (see `README.md` for the vision), delivered as a Claude Code marketplace (`doktoreltern`) of specialist *advisor* plugins. It currently contains one advisor plugin, **`r-science`**: the science-centered R package development workflow spine and its supporting skills. Skills are structured markdown files that teach Claude specialized workflows; the primary skill artifacts are Markdown files consumed directly by Claude's skill system. There is also a Python **context substrate** under `r-science/context/` (the marker grammar, fold/linter, fetch adapter, and MCP server) with its own pytest suite — that is the one part of the repo with runnable, testable code.
 
 The general-purpose R, GitHub, and publishing skills the workflow builds on are **not** in this repository: they live in the upstream [Posit Claude Skills](https://github.com/posit-dev/skills) marketplace (`posit-dev-skills`) and are pulled in as plugin **dependencies** declared in `.claude-plugin/marketplace.json`. This repository was previously a fork of that one; it no longer is.
 

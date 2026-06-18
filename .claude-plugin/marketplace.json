@@ -1,11 +1,11 @@
 {
-  "name": "rjs-skills",
+  "name": "doktoreltern",
   "owner": {
     "name": "Robin Shannon",
     "email": "rjs@robinshannon.net"
   },
   "metadata": {
-    "description": "Science-centered R package development skills. The r-science workflow spine (whiteboard -> plan -> tests -> implement -> verify -> benchmark/optimise -> review, correctness-first and functional by default), depending on the upstream Posit skills for general-purpose R, GitHub, and publishing workflows.",
+    "description": "Doktoreltern - a risk-first methodology for solo and small-scale technical projects, delivered as a committee of specialist advisor plugins. The first advisor, r-science, is a correctness-first, functional-by-default workflow for science-centered R package development (whiteboard -> plan -> tests -> implement -> verify -> benchmark/optimise -> review), depending on the upstream Posit skills for general-purpose R, GitHub, and publishing workflows.",
     "version": "0.2.0"
   },
   "allowCrossMarketplaceDependenciesOn": ["posit-dev-skills"],

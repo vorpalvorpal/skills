@@ -22,7 +22,7 @@ The advisors stack rather than compete: a project can sit under several at once,
 
 ## How it works
 
-- **A tree-like graph of hypotheses, not a plan.** Every piece of the project is an issue in a graph, each carrying two gauges: *confidence* (how sure you are it's right) and *fidelity* (how fully built-out it is, from a sketch to the finished thing).
+- **A tree of hypotheses, not a plan.** Every piece of the project is an issue in a branching tree — strictly a graph, since two branches can come to share a node — each carrying two gauges: *confidence* (how sure you are it's right) and *fidelity* (how fully built-out it is, from a sketch to the finished thing).
 - **Breadth first, then depth where it matters.** Get the whole system roughly working end-to-end — mocked wherever that is enough — then return to deepen the riskiest, most central pieces before the routine ones.
 - **The cheapest check that settles the question.** A doubt might be resolved by a thought experiment, a literature search, a quick prototype or a full implementation. You spend effort in proportion to the risk, not uniformly across the project.
 - **Nothing is forgotten.** Decisions, and the alternatives you rejected, are written down as you go — so the reasoning survives, and a ruled-out mistake stays ruled out.
@@ -39,7 +39,7 @@ Doktoreltern installs as a Claude Code plugin. The r-science advisor depends on 
 ```
 /plugin marketplace add posit-dev/skills
 /plugin marketplace add vorpalvorpal/Doktoreltern
-/plugin install r-science@rjs-skills
+/plugin install r-science@doktoreltern
 ```
 
 Installing `r-science` pulls in the upstream plugins it depends on (general developer, GitHub, r-lib, and publishing skills). To install one of those on its own instead, use `/plugin install <name>@posit-dev-skills`.

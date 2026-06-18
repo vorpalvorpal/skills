@@ -1,6 +1,6 @@
-# Contributing to the r-science skills
+# Contributing to Doktoreltern
 
-Thank you for your interest in contributing! This document provides guidelines for creating and submitting new skills for the science-centered R package development workflow.
+Thank you for your interest in contributing! Doktoreltern is delivered as a committee of specialist advisor plugins; this repository currently holds one, **`r-science`** (the science-centered R package development workflow). This document provides guidelines for creating and submitting new skills for it.
 
 ## Quick Start
 
