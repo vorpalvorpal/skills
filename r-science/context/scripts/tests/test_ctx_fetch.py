@@ -37,6 +37,15 @@ class TestTransportSelection:
         nodes = ctx_fetch.fetch_repo("owner/repo")
         assert [n.number for n in nodes] == [16]
 
+    def test_carries_issue_title(self, monkeypatch):
+        monkeypatch.setattr(ctx_fetch, "_has_gh", lambda: True)
+        monkeypatch.setattr(ctx_fetch, "_gh_json",
+                            lambda args: [{"number": 16, "title": "Epic root",
+                                           "body": "root\n", "state": "open",
+                                           "stateReason": None, "labels": []}])
+        nodes = ctx_fetch.fetch_repo("owner/repo")
+        assert nodes[0].title == "Epic root"
+
     def test_falls_back_to_rest_with_token(self, monkeypatch):
         monkeypatch.setattr(ctx_fetch, "_has_gh", lambda: False)
         monkeypatch.setattr(ctx_fetch, "_token", lambda: "ghp_xxx")

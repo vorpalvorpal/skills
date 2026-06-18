@@ -56,6 +56,23 @@ class TestAdapterShape:
         assert "smith2020" in s.registry
 
 
+class TestTitlePreference:
+    def test_prefers_github_title_over_body_heading(self):
+        nodes = [C.Node(16, "# Body Heading\nThe whole epic.\n", "open", None, set(),
+                        title="Real GitHub Title")]
+        src = ctx_source.RepoSource("r", fetch=lambda r: nodes)
+        assert src.nodes[16]["title"] == "Real GitHub Title"
+
+    def test_falls_back_to_body_heading_then_number(self):
+        nodes = [
+            C.Node(16, "# Body Heading\nx\n", "open", None, set()),          # no gh title
+            C.Node(17, "no heading here\n🧩 Part-of: #16\n", "open", None, set()),
+        ]
+        src = ctx_source.RepoSource("r", fetch=lambda r: nodes)
+        assert src.nodes[16]["title"] == "Body Heading"   # body-heading fallback
+        assert src.nodes[17]["title"] == "#17"            # final fallback
+
+
 class TestServingOverRepoSource:
     def test_get_context_walks_real_tree(self):
         server = _load_server()

@@ -12,12 +12,11 @@ they are tested with no network.
     source.registry: dict[key, entry]
     source.dead_ends: dict[issue, list[str]]
 
-NOTE (#41.q1, deferred): wiring these functions into an actual MCP-SDK transport
-is *not* done here. This directory is named `mcp/`, which shadows the `mcp` SDK
-package; because nothing here imports the SDK and the suite loads this file by
-path, there is no clash today. Adding a real stdio server means either renaming
-this directory or importing the SDK under an absolute path — a decision left to
-#41.q1.
+The MCP-SDK transport lives at the bottom of this file (``build_server``,
+``build_live_server``, ``serve``). The SDK is imported lazily inside those, so the
+pure serving functions above stay importable and testable without ``mcp`` installed.
+The directory is ``ctx_mcp/`` (renamed from ``mcp/``) so it never shadows the ``mcp``
+SDK package (#41.q1, resolved).
 """
 class ContextError(Exception):
     """A structural fault while serving context (broken or cyclic edge)."""
@@ -132,47 +131,92 @@ def _context_payload(source, issue):
     ]
 
 
-def build_server(source, name: str = "ctx-context"):
-    """Register the serving functions as MCP tools over `source`. Returns a FastMCP app."""
-    from mcp.server.fastmcp import FastMCP
+def _register(app, get_source):
+    """Register the six serving functions as MCP tools on ``app``.
 
-    app = FastMCP(name)
+    ``get_source`` is a zero-arg callable returning the source to read; it is
+    invoked once per tool call. A snapshot server passes ``lambda: fixed_source``;
+    the live server passes a factory that rebuilds (re-fetches) per call, which is
+    what keeps the served view fresh as issues are edited.
+    """
 
     @app.tool()
     def context(issue: int):
         """Ancestor path root→issue (bodies + state only; the altitude rule)."""
-        return _context_payload(source, issue)
+        return _context_payload(get_source(), issue)
 
     @app.tool()
     def thread(issue: int):
         """Full comment stream for one node (opt-in detail)."""
-        return get_thread(source, issue)
+        return get_thread(get_source(), issue)
 
     @app.tool()
     def siblings(issue: int):
         """Sibling titles + one-line purposes (not bodies)."""
-        return get_siblings(source, issue)
+        return get_siblings(get_source(), issue)
 
     @app.tool()
     def children(issue: int):
         """Child titles + one-line purposes (not bodies)."""
-        return get_children(source, issue)
+        return get_children(get_source(), issue)
 
     @app.tool()
     def registry(key: str):
         """A single registry entry by key (scoped, never the whole index)."""
-        return query_registry(source, key)
+        return query_registry(get_source(), key)
 
     @app.tool()
     def deadends(scope: int):
         """Dead-ends scoped to one node's subtree."""
-        return query_deadends(source, scope)
+        return query_deadends(get_source(), scope)
 
     return app
 
 
-def serve(repo: str, *, scripts_dir: str | None = None) -> None:  # pragma: no cover - I/O entry
-    """Build a live server over `repo` and run it on stdio."""
+def build_server(source, name: str = "ctx-context"):
+    """Snapshot server over a fixed `source` (used by the tests). Returns a FastMCP app."""
+    from mcp.server.fastmcp import FastMCP
+
+    return _register(FastMCP(name), lambda: source)
+
+
+def build_live_server(make_source, name: str = "ctx-context"):
+    """Live server that rebuilds its source per tool call (always-fresh; re-fetch per call)."""
+    from mcp.server.fastmcp import FastMCP
+
+    return _register(FastMCP(name), make_source)
+
+
+def _detect_repo() -> str:  # pragma: no cover - environment probe
+    """Derive ``owner/repo`` from the local checkout (gh first, then git remote)."""
+    import re
+    import subprocess
+
+    try:
+        out = subprocess.run(
+            ["gh", "repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner"],
+            capture_output=True, text=True,
+        )
+        if out.returncode == 0 and out.stdout.strip():
+            return out.stdout.strip()
+    except FileNotFoundError:
+        pass
+
+    out = subprocess.run(
+        ["git", "remote", "get-url", "origin"], capture_output=True, text=True
+    )
+    m = re.search(r"[:/]([^/:]+/[^/]+?)(?:\.git)?$", out.stdout.strip())
+    if m:
+        return m.group(1)
+    raise SystemExit("could not detect repo; pass owner/repo as an argument")
+
+
+def serve(repo: str | None = None, *, scripts_dir: str | None = None) -> None:  # pragma: no cover - I/O entry
+    """Build a live server over `repo` (auto-detected from git if omitted) and run it on stdio.
+
+    The source is rebuilt per tool call, so the served view always reflects the
+    latest issue edits (re-fetch per call, the agreed freshness model).
+    """
     import os
     import sys
 
@@ -181,13 +225,11 @@ def serve(repo: str, *, scripts_dir: str | None = None) -> None:  # pragma: no c
         sys.path.insert(0, sd)
     import ctx_source
 
-    build_server(ctx_source.RepoSource(repo)).run()
+    target = repo or _detect_repo()
+    build_live_server(lambda: ctx_source.RepoSource(target)).run()
 
 
 if __name__ == "__main__":  # pragma: no cover
     import sys
 
-    if len(sys.argv) < 2:
-        print("usage: server.py <owner/repo>", file=sys.stderr)
-        raise SystemExit(2)
-    serve(sys.argv[1])
+    serve(sys.argv[1] if len(sys.argv) > 1 else None)

@@ -5,9 +5,9 @@ The pure serving functions in ``ctx_mcp/server.py`` expect a ``source`` exposing
 ``FakeSource``). This builds that from ``ctx_fetch.fetch_repo`` + ``ctx_core.collate``.
 ``fetch`` and ``collate`` are injectable so it can be tested without a network.
 
-Title and the short "purpose" are derived from the node body (the stub opens with
-``# <title>`` and a one-line purpose), so no extra fetch field is needed. Maps to
-#41 (context MCP).
+The title is the GitHub issue title (``Node.title``), falling back to a ``# <title>``
+heading in the body and then ``#<number>``; the short "purpose" is the first prose
+line of the body. Maps to #41 (context MCP).
 """
 from __future__ import annotations
 
@@ -56,7 +56,7 @@ class RepoSource:
         self.nodes: dict = {}
         for n, node in model.nodes.items():
             self.nodes[n] = dict(
-                title=_title(node.body, n),
+                title=node.title or _title(node.body, n),
                 body=node.body,
                 state=node.state,
                 state_reason=node.state_reason,

@@ -137,6 +137,7 @@ def _node_from_issue(d: dict, comments=None) -> ctx_core.Node:
         _state_reason(d),
         _labels(d.get("labels")),
         cs,
+        title=d.get("title") or "",
     )
 
 
@@ -174,7 +175,7 @@ def fetch_repo(repo: str) -> list:
     if _has_gh():
         issues = _gh_json([
             "issue", "list", "--repo", repo, "--state", "all", "--limit", "1000",
-            "--json", "number,body,state,stateReason,labels,comments",
+            "--json", "number,title,body,state,stateReason,labels,comments",
         ])
         return [_node_from_issue(d) for d in issues]
     if _token() is None:

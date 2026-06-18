@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "ctx": {
+      "command": "uv",
+      "args": [
+        "run",
+        "--with",
+        "mcp",
+        "python",
+        "r-science/context/ctx_mcp/server.py"
+      ]
+    }
+  }
+}

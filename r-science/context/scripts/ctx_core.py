@@ -360,6 +360,7 @@ class Node:
     state_reason: str | None  # "completed" | "not_planned" | None
     labels: set           # set[str]
     comments: list = field(default_factory=list)  # list[Comment]
+    title: str = ""       # the GitHub issue title (canonical node title; "" if unfetched)
 
 
 @dataclass
