@@ -56,6 +56,35 @@ class TestAdapterShape:
         assert "smith2020" in s.registry
 
 
+class TestPurposeExtraction:
+    def _purpose_for(self, body):
+        nodes = [C.Node(16, body, "open", None, set())]
+        return ctx_source.RepoSource("r", fetch=lambda r: nodes).nodes[16]["purpose"]
+
+    def test_strips_leading_bold_label(self):
+        body = ("# X\n🧩 Part-of: #1\n"
+                "**Stub.** The control layer adds the **axes** and **scheduler**. More.\n")
+        assert self._purpose_for(body) == "The control layer adds the axes and scheduler."
+
+    def test_strips_partof_connector_and_emphasis(self):
+        body = "# X\nPart of #1. **The foundation** everything consumes.\n"
+        assert self._purpose_for(body) == "The foundation everything consumes."
+
+    def test_takes_only_the_first_sentence(self):
+        body = "# X\nFirst sentence here. Second sentence.\n"
+        assert self._purpose_for(body) == "First sentence here."
+
+    def test_joins_wrapped_lines_no_midsentence_truncation(self):
+        # regression for #32-style bodies that previously returned a garbled
+        # continuation line beginning "axes** (...".
+        body = ("# X\n🧩 Part-of: #1\n"
+                "**Stub.** The control layer adds the **four\n"
+                "axes** (a, b), the **scheduler**.\n")
+        p = self._purpose_for(body)
+        assert p == "The control layer adds the four axes (a, b), the scheduler."
+        assert "**" not in p and not p.startswith("axes")
+
+
 class TestTitlePreference:
     def test_prefers_github_title_over_body_heading(self):
         nodes = [C.Node(16, "# Body Heading\nThe whole epic.\n", "open", None, set(),
