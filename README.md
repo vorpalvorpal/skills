@@ -5,9 +5,9 @@
 >
 > A risk-first methodology for solo and small-scale technical projects.
 
-Doktoreltern is a way of building scientific and technical software when you're mostly working on your own, with AI doing much of the legwork. It's aimed at people who are experts in their own field but not in AI: you keep the judgement, while the methodology and the tools handle the busywork.
+Doktoreltern is a way of building scientific and technical software when you're mostly working on your own, with AI doing much of the legwork. It's aimed at people who have technical domain expertise, rather than project management or software development expertise: you keep the judgement, while the methodology and the tools handle the busywork.
 
-The core idea is simple. Most projects fail not because the code was bad, but because a load-bearing decision near the centre turned out to be wrong after everything else had been built on top of it. So instead of planning the whole thing up front, or building one piece to completion before starting the next, Doktoreltern has you tackle the parts you're least sure about — and that everything else depends on — first, so that when an idea doesn't hold up you find out while it's still cheap to change.
+The core idea is simple. Most projects fail not because the implementation was bad, but because a load-bearing decision near the centre turned out to be wrong after everything else had been built on top of it. So instead of planning the whole thing up front, or building one piece to completion before starting the next, Doktoreltern has you tackle the parts you're least sure about — and that everything else depends on — first, so that when an idea doesn't hold up you find out while it's still cheap to change.
 
 ## The name
 
@@ -22,7 +22,7 @@ The advisors stack rather than compete: a project can sit under several at once,
 
 ## How it works
 
-- **A tree of hypotheses, not a plan.** Every piece of the project is an issue in a tree, each carrying two gauges: *confidence* (how sure you are it's right) and *fidelity* (how fully built-out it is, from a sketch to the finished thing).
+- **A tree-like graph of hypotheses, not a plan.** Every piece of the project is an issue in a graph, each carrying two gauges: *confidence* (how sure you are it's right) and *fidelity* (how fully built-out it is, from a sketch to the finished thing).
 - **Breadth first, then depth where it matters.** Get the whole system roughly working end-to-end — mocked wherever that is enough — then return to deepen the riskiest, most central pieces before the routine ones.
 - **The cheapest check that settles the question.** A doubt might be resolved by a thought experiment, a literature search, a quick prototype or a full implementation. You spend effort in proportion to the risk, not uniformly across the project.
 - **Nothing is forgotten.** Decisions, and the alternatives you rejected, are written down as you go — so the reasoning survives, and a ruled-out mistake stays ruled out.
