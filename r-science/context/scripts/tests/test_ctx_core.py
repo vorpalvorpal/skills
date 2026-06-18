@@ -219,6 +219,13 @@ class TestCollate:
         model = ctx_core.collate(nodes)
         assert (16, 17) in model.tree_edges
 
+    def test_blocked_by_is_indexed(self):
+        """Blocked-by markers collate into a blocked_by index (mirrors boundaries)."""
+        nodes = [ctx_core.Node(2, "🧩 Part-of: #1\n⛔ Blocked-by: #3, #4\n",
+                               "open", None, set())]
+        model = ctx_core.collate(nodes)
+        assert model.blocked_by == {2: [3, 4]}
+
     def test_cites_and_eq_populate_the_registry(self):
         """Citation and equation markers collate into the queryable registry."""
         nodes = [ctx_core.Node(17, "🟰 Eq: smith2020_msPAF\n📚 Cites: smith2020\n",

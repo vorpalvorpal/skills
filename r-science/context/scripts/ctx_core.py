@@ -390,6 +390,7 @@ class Model:
     tree_edges : set of (parent, child) tuples
     aspects : dict[issue_number, list[str]]
     boundaries : dict[issue_number, list[int]]
+    blocked_by : dict[issue_number, list[int]]
     build_order : list[int]  (topological, roots first)
     design_links : dict[issue_number, int]
     registry : _Registry  (citation/eq keys → issue numbers; supports `in` / [key])
@@ -401,6 +402,7 @@ class Model:
         self.tree_edges: set = set()
         self.aspects: dict = defaultdict(list)
         self.boundaries: dict = {}
+        self.blocked_by: dict = {}
         self.build_order: list = []
         self.design_links: dict = {}
         self.registry: _Registry = _Registry()
@@ -741,6 +743,8 @@ def collate(nodes: list) -> Model:
                     model.aspects[node.number].append(mk.value)
             elif mk.kind == BOUNDARY:
                 model.boundaries[node.number] = mk.value
+            elif mk.kind == BLOCKED_BY:
+                model.blocked_by[node.number] = mk.value
             elif mk.kind == DESIGN:
                 model.design_links[node.number] = mk.value
             elif mk.kind == EQ:
