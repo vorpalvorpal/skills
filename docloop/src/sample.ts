@@ -23,7 +23,7 @@ export const OLD_MD = [
   '',
   '---',
   '',
-  '<article data-thread="t1">t1 open. rjs: source for the speed claim?</article>',
+  '<article data-thread="t1">t1 open.<br>rjs: source for the speed claim?</article>',
 ].join('\n');
 
 export const NEW_MD = [
@@ -37,5 +37,5 @@ export const NEW_MD = [
   '',
   '---',
   '',
-  '<article data-thread="t1">t1 open. rjs: source for the speed claim? C: added, see field log p.4.</article>',
+  '<article data-thread="t1">t1 open.<br>rjs: source for the speed claim?<br>C: added, see field log p.4.</article>',
 ].join('\n');

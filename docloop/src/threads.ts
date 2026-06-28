@@ -58,3 +58,16 @@ export function extractThreads(markdown: string): Thread[] {
 
   return threads;
 }
+
+/**
+ * Split a thread body into its turns. Replies are stored `<br>`-joined (see
+ * src/foot.ts), so a multi-reply thread shows as several lines; a thread with no
+ * replies is a single turn. Tolerates `<br>`, `<br/>`, `<br />`; empty turns are
+ * dropped.
+ */
+export function splitTurns(body: string): string[] {
+  return body
+    .split(/<br\s*\/?>/i)
+    .map((turn) => turn.trim())
+    .filter((turn) => turn.length > 0);
+}

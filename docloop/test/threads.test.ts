@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { extractThreads } from '../src/threads';
+import { extractThreads, splitTurns } from '../src/threads';
 
 describe('extractThreads', () => {
   it('joins a <mark> anchor with its <article> body by data-thread id', () => {
@@ -31,5 +31,23 @@ describe('extractThreads', () => {
     expect(extractThreads(md)).toEqual([
       { id: 't9', anchor: 'orphan', body: null },
     ]);
+  });
+});
+
+describe('splitTurns', () => {
+  it('splits a <br>-joined body into trimmed turns', () => {
+    expect(splitTurns('t1 open.<br>rjs: source?<br>C: added.')).toEqual([
+      't1 open.',
+      'rjs: source?',
+      'C: added.',
+    ]);
+  });
+
+  it('returns a single turn when there are no <br> separators', () => {
+    expect(splitTurns('just one note')).toEqual(['just one note']);
+  });
+
+  it('tolerates <br/> and <br /> variants and drops empty turns', () => {
+    expect(splitTurns('a<br/>b<br />c<br>')).toEqual(['a', 'b', 'c']);
   });
 });
