@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>docloop — read view (M1)</title>
+    <link rel="stylesheet" href="./src/style.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <strong>docloop</strong>
+      <span class="muted">read view — M1 (read-only; editing is M2)</span>
+      <span class="legend">
+        <span class="chip chip-ins">inserted</span>
+        <span class="chip chip-del">deleted</span>
+        <span class="chip chip-mark">comment anchor</span>
+      </span>
+    </header>
+    <main class="layout">
+      <!-- Milkdown mounts here -->
+      <section id="editor" class="doc"></section>
+      <!-- Threads sidebar -->
+      <aside id="sidebar" class="sidebar">
+        <h2>Threads</h2>
+        <ol id="threads" class="threads"></ol>
+      </aside>
+    </main>
+    <script type="module" src="./src/main.ts"></script>
+  </body>
+</html>

@@ -1,0 +1,145 @@
+/* Minimal read-view styling. The three decoration classes (docloop-ins,
+   docloop-del, docloop-mark) and the sidebar badge are the load-bearing bits;
+   everything else is just enough chrome to read the doc comfortably. */
+
+:root {
+  --bg: #ffffff;
+  --fg: #1a1a1a;
+  --muted: #6b7280;
+  --rule: #e5e7eb;
+  --ins-bg: #dcfce7; /* green-100 */
+  --ins-fg: #166534; /* green-800 */
+  --del-bg: #fee2e2; /* red-100  */
+  --del-fg: #991b1b; /* red-800  */
+  --mark-bg: #fef9c3; /* yellow-100 */
+  --mark-border: #eab308; /* yellow-500 */
+  --accent: #2563eb;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  color: var(--fg);
+  background: var(--bg);
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem 1rem;
+  border-bottom: 1px solid var(--rule);
+  font-size: 0.9rem;
+}
+.topbar .muted { color: var(--muted); }
+.topbar .legend { margin-left: auto; display: flex; gap: 0.4rem; }
+
+.chip {
+  font-size: 0.72rem;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  border: 1px solid transparent;
+}
+.chip-ins { background: var(--ins-bg); color: var(--ins-fg); }
+.chip-del { background: var(--del-bg); color: var(--del-fg); }
+.chip-mark { background: var(--mark-bg); border-color: var(--mark-border); }
+
+/* Two-column read layout: document + threads sidebar. */
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 1.5rem;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 1.5rem 1rem;
+  align-items: start;
+}
+
+.doc {
+  line-height: 1.6;
+  font-size: 1rem;
+}
+.doc :first-child { margin-top: 0; }
+
+/* --- diff decorations --- */
+.docloop-ins {
+  background: var(--ins-bg);
+  color: var(--ins-fg);
+  border-radius: 2px;
+  text-decoration: none;
+}
+/* The delete widget is a real <del> element injected at the deletion point. */
+.docloop-del {
+  background: var(--del-bg);
+  color: var(--del-fg);
+  text-decoration: line-through;
+  border-radius: 2px;
+  padding: 0 1px;
+  margin: 0 1px;
+}
+
+/* --- comment-anchor highlight, cross-linked to the sidebar via a badge --- */
+.docloop-mark {
+  background: var(--mark-bg);
+  box-shadow: inset 0 -2px 0 var(--mark-border);
+  border-radius: 2px;
+  position: relative;
+}
+.docloop-mark::after {
+  content: attr(data-badge);
+  font-size: 0.6rem;
+  font-weight: 700;
+  color: #fff;
+  background: var(--mark-border);
+  border-radius: 999px;
+  padding: 0 0.3rem;
+  margin-left: 0.15rem;
+  vertical-align: super;
+}
+
+/* --- threads sidebar --- */
+.sidebar {
+  border-left: 1px solid var(--rule);
+  padding-left: 1.25rem;
+  position: sticky;
+  top: 1rem;
+}
+.sidebar h2 {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  margin: 0 0 0.75rem;
+}
+.threads { list-style: none; margin: 0; padding: 0; }
+.thread {
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  padding: 0.6rem 0.7rem;
+  margin-bottom: 0.6rem;
+  font-size: 0.85rem;
+}
+.thread-head {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.3rem;
+}
+.thread-badge {
+  display: inline-flex;
+  min-width: 1.2rem;
+  height: 1.2rem;
+  align-items: center;
+  justify-content: center;
+  background: var(--mark-border);
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 700;
+  border-radius: 999px;
+}
+.thread-anchor { color: var(--muted); font-style: italic; }
+.thread-body { color: var(--fg); }
+.thread-orphan { color: var(--del-fg); }
+.muted { color: var(--muted); }
