@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>docloop — review view (M3)</title>
+    <link rel="stylesheet" href="./src/style.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <strong>docloop</strong>
+      <span class="muted">review view — M3 (loop)</span>
+      <span class="legend">
+        <span class="chip chip-ins">inserted</span>
+        <span class="chip chip-del">deleted</span>
+        <span class="chip chip-mark">comment anchor</span>
+      </span>
+      <button id="add-comment" class="btn btn-primary" disabled>
+        Add comment
+      </button>
+      <button id="reload" class="btn" title="Pull the latest committed doc (Claude's turn)">Reload</button>
+      <button id="commit" class="btn">Hand to Claude</button>
+    </header>
+    <main class="layout">
+      <!-- Milkdown mounts here -->
+      <section id="editor" class="doc"></section>
+      <!-- Sidebar: pending changes + threads -->
+      <aside id="sidebar" class="sidebar">
+        <h2>Changes</h2>
+        <ol id="changes" class="changes"></ol>
+        <h2>Threads</h2>
+        <ol id="threads" class="threads"></ol>
+      </aside>
+    </main>
+    <script type="module" src="./src/main.ts"></script>
+  </body>
+</html>
