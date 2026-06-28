@@ -3,13 +3,13 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>docloop — write view (M2)</title>
+    <title>docloop — review view (M3)</title>
     <link rel="stylesheet" href="./src/style.css" />
   </head>
   <body>
     <header class="topbar">
       <strong>docloop</strong>
-      <span class="muted">write view — M2 (editable)</span>
+      <span class="muted">review view — M3 (loop)</span>
       <span class="legend">
         <span class="chip chip-ins">inserted</span>
         <span class="chip chip-del">deleted</span>
@@ -18,6 +18,8 @@
       <button id="add-comment" class="btn btn-primary" disabled>
         Add comment
       </button>
+      <button id="reload" class="btn" title="Pull the latest committed doc (Claude's turn)">Reload</button>
+      <button id="commit" class="btn">Hand to Claude</button>
     </header>
     <main class="layout">
       <!-- Milkdown mounts here -->

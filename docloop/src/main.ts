@@ -18,7 +18,7 @@ import { DecorationSet } from '@milkdown/prose/view';
 import { createEditor, type DocloopEditor } from './editor';
 import { buildReadViewDecorations } from './decorations';
 import { decorationPlugin, decoPluginKey } from './deco-plugin';
-import { extractThreads, type Thread } from './threads';
+import { extractThreads, splitTurns, type Thread } from './threads';
 import {
   addComment,
   reply as replyAction,
@@ -43,6 +43,31 @@ interface App {
   focusReplyFor: string | null;
 }
 
+/**
+ * Load the document + diff baseline. Prefers the live git workspace via `GET
+ * /doc` (current = HEAD, baseline = the commit before it) so the GUI reflects the
+ * real loop; falls back to the bundled sample when no workspace exists yet (e.g.
+ * a fresh checkout or the static build), so the demo still shows a diff.
+ */
+async function loadState(): Promise<{ current: string; baseline: string }> {
+  try {
+    const res = await fetch('/doc');
+    const json = (await res.json()) as {
+      ok: boolean;
+      present?: boolean;
+      current?: string;
+      baseline?: string | null;
+    };
+    if (json.ok && json.present && typeof json.current === 'string') {
+      // No prior commit -> baseline == current, so nothing diffs (correct).
+      return { current: json.current, baseline: json.baseline ?? json.current };
+    }
+  } catch {
+    // No dev server / endpoint — fall through to the sample.
+  }
+  return { current: NEW_MD, baseline: OLD_MD };
+}
+
 async function main(): Promise<void> {
   const editorRoot = document.getElementById('editor');
   const threadList = document.getElementById('threads');
@@ -52,16 +77,18 @@ async function main(): Promise<void> {
     throw new Error('missing #editor / #threads / #changes / #add-comment');
   }
 
-  // Editable editor with NEW_MD. The decoration plugin starts empty; filled
-  // after the doc (and its positions) exists.
-  const ed = await createEditor(editorRoot, NEW_MD, {
+  const { current, baseline } = await loadState();
+
+  // Editable editor with the current doc. The decoration plugin starts empty;
+  // filled after the doc (and its positions) exists.
+  const ed = await createEditor(editorRoot, current, {
     editable: true,
     plugins: [decorationPlugin(DecorationSet.empty)],
   });
 
   const app: App = {
     ed,
-    baselineMd: OLD_MD,
+    baselineMd: baseline,
     els: { threads: threadList, changes, addBtn },
     focusReplyFor: null,
   };
@@ -83,7 +110,56 @@ async function main(): Promise<void> {
     }
   });
 
+  const commitBtn = document.getElementById('commit') as HTMLButtonElement | null;
+  if (commitBtn) wireCommit(ed, commitBtn);
+
+  // "Reload" pulls the latest committed doc (e.g. after Claude's turn) and
+  // re-derives the view against the previous commit.
+  const reloadBtn = document.getElementById('reload') as HTMLButtonElement | null;
+  if (reloadBtn) {
+    reloadBtn.addEventListener('click', async () => {
+      reloadBtn.disabled = true;
+      try {
+        const next = await loadState();
+        loadMarkdown(app.ed, next.current);
+        app.baselineMd = next.baseline;
+        rerender(app);
+      } finally {
+        reloadBtn.disabled = false;
+      }
+    });
+  }
+
   rerender(app);
+}
+
+/**
+ * Commit the current document state to the workspace git repo (commit == turn).
+ * Serialises the live doc via the M0 path and POSTs it to the dev-server
+ * `/commit` endpoint (see vite.config.ts), which writes it and git-commits.
+ */
+function wireCommit(ed: DocloopEditor, btn: HTMLButtonElement): void {
+  const label = btn.textContent;
+  btn.addEventListener('click', async () => {
+    btn.disabled = true;
+    btn.textContent = 'Committing…';
+    try {
+      const res = await fetch('/commit', { method: 'POST', body: currentMarkdown(ed) });
+      const json = (await res.json()) as { ok: boolean; committed?: boolean; commit?: string };
+      btn.textContent = !json.ok
+        ? 'Commit failed'
+        : json.committed
+          ? `Committed ${json.commit}`
+          : 'No changes';
+    } catch {
+      btn.textContent = 'Commit failed';
+    } finally {
+      window.setTimeout(() => {
+        btn.textContent = label;
+        btn.disabled = false;
+      }, 2500);
+    }
+  });
 }
 
 /** Re-derive decorations + sidebar + changes panel from the current state. */
@@ -150,10 +226,10 @@ function renderThreads(app: App, threads: Thread[]): void {
       body.textContent = t.body === '' ? '(no replies yet)' : '(orphan anchor — no thread body)';
     } else {
       body.className = 'thread-body';
-      // Replies are <br>-joined in storage; show them as separate lines.
-      t.body.split('<br>').forEach((line, j) => {
+      // Replies are <br>-joined in storage; show each turn on its own line.
+      splitTurns(t.body).forEach((turn, j) => {
         if (j > 0) body.appendChild(document.createElement('br'));
-        body.appendChild(document.createTextNode(line));
+        body.appendChild(document.createTextNode(turn));
       });
     }
     li.appendChild(body);
