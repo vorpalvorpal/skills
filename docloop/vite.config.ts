@@ -4,6 +4,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { join } from 'node:path';
 import { renderTurn } from './src/turn';
+import { listThreads, addComment, resolveThread, newThreadId } from './src/threads-store';
 
 const run = promisify(execFile);
 
@@ -28,6 +29,7 @@ function docloopEndpoints(): Plugin {
   const workspace = join(process.cwd(), 'workspace');
   const docPath = join(workspace, 'doc.md');
   const turnPath = join(workspace, 'turn.xml');
+  const threadsDir = join(workspace, 'threads'); // sidecar store: threads/<id>/NNNN.md
   const git = (...args: string[]) => run('git', ['-C', workspace, ...args]);
 
   /**
@@ -116,6 +118,44 @@ function docloopEndpoints(): Plugin {
             // baseline: the commit before HEAD (null if HEAD is the first commit).
             const baseline = await showDoc('HEAD~1');
             send(res, 200, { ok: true, present: true, current, baseline });
+          } catch (err) {
+            send(res, 500, { ok: false, error: String(err) });
+          }
+        })();
+      });
+
+      // /threads — the sidecar comment store (threads/<id>/NNNN.md). The browser
+      // can't touch the filesystem, so it reaches the store through here.
+      //   GET    /threads        → { threads: [...] }   (all threads + comments)
+      //   POST   /threads        → create a new thread (allocates the id) + 1st comment
+      //   POST   /threads/<id>   → append a comment (reply) to an existing thread
+      //   DELETE /threads/<id>   → resolve (delete) the thread
+      // Body for POST is JSON `{ author, body }`.
+      server.middlewares.use('/threads', (req, res, next) => {
+        const id = (req.url ?? '/').replace(/^\/+/, '').split('?')[0];
+        void (async () => {
+          try {
+            await mkdir(threadsDir, { recursive: true });
+            if (req.method === 'GET') {
+              return send(res, 200, { ok: true, threads: await listThreads(threadsDir) });
+            }
+            if (req.method === 'POST') {
+              const raw = await readBody(req);
+              const input = raw ? (JSON.parse(raw) as { author?: string; body?: string }) : {};
+              const author = String(input.author ?? 'rjs');
+              const body = String(input.body ?? '');
+              // id in the URL → reply; no id → new thread (allocate next free id).
+              const threadId =
+                id || newThreadId((await listThreads(threadsDir)).map((t) => t.id));
+              const comment = await addComment(threadsDir, threadId, { author, body });
+              return send(res, 200, { ok: true, id: threadId, comment });
+            }
+            if (req.method === 'DELETE') {
+              if (!id) return send(res, 400, { ok: false, error: 'missing thread id' });
+              await resolveThread(threadsDir, id);
+              return send(res, 200, { ok: true });
+            }
+            return next();
           } catch (err) {
             send(res, 500, { ok: false, error: String(err) });
           }
