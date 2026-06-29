@@ -20,13 +20,14 @@ afterEach(async () => {
 });
 
 describe('diff decorations (integration)', () => {
-  it("body text index excludes the foot-region (<article> text isn't in it)", async () => {
+  it('body text index covers the whole document, tags/punctuation excluded', async () => {
     const root = document.createElement('div');
     ed = await createEditor(root, NEW_MD);
     const idx = buildBodyTextIndex(ed.view.state.doc);
     expect(idx.text).toContain('brown fox'); // body content present
-    expect(idx.text).not.toContain('field log'); // foot-region content excluded
-    expect(idx.text).not.toContain('---'); // delimiter not in text content
+    expect(idx.text).toContain('questionable claim'); // the anchored span's text
+    expect(idx.text).not.toContain(':mark'); // directive punctuation not in text
+    expect(idx.text).not.toContain('{#t1}');
   });
 
   it('builds one inline insert decoration and one delete widget for a 1-word-in/1-word-out edit', async () => {
@@ -54,21 +55,7 @@ describe('diff decorations (integration)', () => {
     expect(covered).toContain('brown');
   });
 
-  it('foot-region edits do not produce diff decorations', async () => {
-    // OLD/NEW differ in the <article> body too; that change must be invisible.
-    const root = document.createElement('div');
-    ed = await createEditor(root, NEW_MD);
-    const oldDoc = ed.parse(OLD_MD);
-    const set = buildDiffDecorations(oldDoc, ed.view.state.doc);
-    const text = set
-      .find()
-      .map((d) => String((d.spec as any)?.key ?? ''))
-      .join(' ');
-    // No widget anchored to foot-region content (we only diffed body text).
-    expect(text).not.toContain('field log');
-  });
-
-  it('finds the <mark> thread span and numbers it', async () => {
+  it('finds the comment-anchor span and numbers it', async () => {
     const root = document.createElement('div');
     ed = await createEditor(root, NEW_MD);
     const marks = findMarkHighlights(ed.view.state.doc);

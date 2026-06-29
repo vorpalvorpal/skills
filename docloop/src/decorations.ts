@@ -1,5 +1,5 @@
 /**
- * Diff → ProseMirror decoration mapping, and <mark> thread highlighting.
+ * Diff → ProseMirror decoration mapping, and comment-anchor highlighting.
  *
  * The load-bearing idea (per the M1 brief): map the diff to ProseMirror
  * **positions**, not raw-markdown offsets. Raw markdown carries punctuation and
@@ -13,36 +13,25 @@ import { Decoration, DecorationSet } from '@milkdown/prose/view';
 import { computeDiff } from './diff';
 
 /**
- * A flat view of a doc's body text: the concatenated text content of every text
- * node **above the last `hr`** (the foot-region delimiter), plus a function that
- * maps a character offset in that string back to a ProseMirror position.
- *
- * Only text above the last `hr` is included so the `<article>` foot-region is
- * excluded from diffing — the same rule computeDiff applies to markdown, applied
- * here to the live doc.
+ * A flat view of a doc's text: the concatenated text content of every text node,
+ * plus a function that maps a character offset in that string back to a
+ * ProseMirror position. The whole document is content now — threads live in the
+ * sidecar store, not in a `<article>` foot-region — so nothing is excluded.
  */
 export interface BodyTextIndex {
-  /** concatenated visible text of the body (no tags, no markdown punctuation) */
+  /** concatenated visible text of the doc (no tags, no markdown punctuation) */
   text: string;
   /** PM position of the character at offset `i`; `posAt(text.length)` is the end */
   posAt(offset: number): number;
 }
 
 export function buildBodyTextIndex(doc: PMNode): BodyTextIndex {
-  // Find the position of the LAST top-level `hr` (the final `---`). Text at or
-  // after it belongs to the foot-region and is ignored.
-  let lastHrPos = Infinity;
-  doc.forEach((node, offset) => {
-    if (node.type.name === 'hr') lastHrPos = offset;
-  });
-
-  // Walk text nodes before the hr, recording the PM position of each character.
+  // Walk every text node, recording the PM position of each character.
   // `offsets[i]` is the PM position of text[i]; we also push the position just
   // past the final character so a range end maps cleanly.
   let text = '';
   const offsets: number[] = [];
   doc.descendants((node, pos) => {
-    if (pos >= lastHrPos) return false; // stop descending into the foot-region
     if (node.isText && node.text) {
       for (let i = 0; i < node.text.length; i++) offsets.push(pos + i);
       text += node.text;
@@ -135,9 +124,9 @@ export function diffDecorationList(oldDoc: PMNode, newDoc: PMNode): Decoration[]
  * Highlight every comment-anchor span in the doc and tag it with the thread id +
  * a 1-based badge number, so the sidebar can cross-link.
  *
- * As of M2 (the "road bump" — see src/comment-mark.ts) the anchor is a proper
- * ProseMirror **schema mark** (`commentAnchor`, carrying a `threadId` attr), not
- * the M1 raw-html-node pairs. We therefore locate the highlight by scanning text
+ * The anchor is a ProseMirror **schema mark** (`commentAnchor`, carrying a
+ * `threadId` attr — see src/anchor.ts), serialised as a `:mark[…]{#id}` directive.
+ * We therefore locate the highlight by scanning text
  * nodes that carry the mark and coalescing contiguous runs of the *same*
  * threadId into one span. (Two anchors with different ids that happen to touch
  * stay separate; a single anchor stays one run because ProseMirror keeps equal
@@ -150,7 +139,7 @@ export interface MarkHighlight {
   to: number;
 }
 
-/** The schema mark name; mirrors COMMENT_ANCHOR in src/comment-mark.ts. */
+/** The schema mark name; mirrors COMMENT_ANCHOR in src/anchor.ts. */
 const COMMENT_ANCHOR = 'commentAnchor';
 
 export function findMarkHighlights(doc: PMNode): MarkHighlight[] {

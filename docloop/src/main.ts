@@ -1,39 +1,54 @@
 /**
- * docloop write view (M2) entry point.
+ * docloop read/write view entry point.
  *
- * M1 was read-only; M2 makes the same view writeable while keeping the editor's
- * doc as the single source of truth (see src/write-actions.ts). It wires:
+ * The editor's ProseMirror doc is the source of truth for the *document* (prose +
+ * `:mark` anchors); comment **bodies** live in the sidecar `/threads` store. This
+ * wires the two together:
  *
- *   - the diff vs a mutable BASELINE (starts as OLD_MD) painted as ProseMirror
- *     decorations (green inserts, red delete widgets) + the <mark> anchor
- *     highlights — re-derived after every action,
- *   - a threads sidebar with a reply box per thread and a Resolve control,
+ *   - the diff vs a mutable BASELINE painted as ProseMirror decorations (green
+ *     inserts, red delete widgets) + the comment-anchor highlights — re-derived
+ *     after every action,
+ *   - a threads sidebar: each document anchor joined with its store comments
+ *     (rendered via a read-only Milkdown instance), a reply box, and a Resolve
+ *     control,
  *   - an "Add comment" button that anchors a comment on the current selection,
  *   - a "Changes" panel listing each diff hunk with Accept / Reject controls.
  *
- * Every mutation goes through the M0 serialise→transform→reload path, so the doc
- * the editor holds and the markdown that would be saved never disagree.
+ * Document mutations go through the M0 serialise→transform→reload path; comment
+ * mutations go through the `/threads` endpoints (src/threads-client.ts), with an
+ * in-memory fallback so the bundled demo still works with no dev server.
  */
 import { DecorationSet } from '@milkdown/prose/view';
 import { createEditor, type DocloopEditor } from './editor';
 import { buildReadViewDecorations } from './decorations';
 import { decorationPlugin, decoPluginKey } from './deco-plugin';
-import { extractThreads, splitTurns, type Thread } from './threads';
+import { extractAnchors, nextThreadId, type Anchor } from './threads';
 import {
-  addComment,
-  reply as replyAction,
-  resolve as resolveAction,
+  applyAnchor,
+  removeAnchor,
   currentMarkdown,
   loadMarkdown,
   hasTextSelection,
 } from './write-actions';
+import {
+  fetchThreads,
+  replyThread,
+  resolveThread,
+  type StoreThread,
+} from './threads-client';
 import { listHunks, acceptHunk, rejectHunk, type Hunk } from './hunks';
-import { OLD_MD, NEW_MD } from './sample';
+import { OLD_MD, NEW_MD, SAMPLE_THREADS } from './sample';
 
-/** Mutable app state: the editor + the diff baseline (advances as hunks accept). */
+/** Mutable app state: the editor, the diff baseline, and the cached store. */
 interface App {
   ed: DocloopEditor;
   baselineMd: string;
+  /** comment store, cached from `/threads` (or SAMPLE_THREADS offline) */
+  threads: StoreThread[];
+  /** whether the `/threads` endpoint is live (else mutate `threads` in-memory) */
+  usingStore: boolean;
+  /** read-only Milkdown instances rendering comment bodies, torn down each render */
+  commentEditors: DocloopEditor[];
   els: {
     threads: HTMLElement;
     changes: HTMLElement;
@@ -45,9 +60,7 @@ interface App {
 
 /**
  * Load the document + diff baseline. Prefers the live git workspace via `GET
- * /doc` (current = HEAD, baseline = the commit before it) so the GUI reflects the
- * real loop; falls back to the bundled sample when no workspace exists yet (e.g.
- * a fresh checkout or the static build), so the demo still shows a diff.
+ * /doc`; falls back to the bundled sample when no workspace exists yet.
  */
 async function loadState(): Promise<{ current: string; baseline: string }> {
   try {
@@ -68,6 +81,19 @@ async function loadState(): Promise<{ current: string; baseline: string }> {
   return { current: NEW_MD, baseline: OLD_MD };
 }
 
+/**
+ * Load the comment store. Prefers the live `/threads` endpoint; falls back to the
+ * bundled SAMPLE_THREADS (and `usingStore: false`, so later mutations stay
+ * in-memory) when no dev server is reachable.
+ */
+async function loadThreads(): Promise<{ threads: StoreThread[]; usingStore: boolean }> {
+  try {
+    return { threads: await fetchThreads(), usingStore: true };
+  } catch {
+    return { threads: SAMPLE_THREADS, usingStore: false };
+  }
+}
+
 async function main(): Promise<void> {
   const editorRoot = document.getElementById('editor');
   const threadList = document.getElementById('threads');
@@ -78,9 +104,8 @@ async function main(): Promise<void> {
   }
 
   const { current, baseline } = await loadState();
+  const { threads, usingStore } = await loadThreads();
 
-  // Editable editor with the current doc. The decoration plugin starts empty;
-  // filled after the doc (and its positions) exists.
   const ed = await createEditor(editorRoot, current, {
     editable: true,
     plugins: [decorationPlugin(DecorationSet.empty)],
@@ -89,12 +114,14 @@ async function main(): Promise<void> {
   const app: App = {
     ed,
     baselineMd: baseline,
+    threads,
+    usingStore,
+    commentEditors: [],
     els: { threads: threadList, changes, addBtn },
     focusReplyFor: null,
   };
 
-  // "Add comment" is enabled only when there's a span to anchor on. Keep it in
-  // sync with the selection.
+  // "Add comment" is enabled only when there's a span to anchor on.
   const syncAddBtn = () => {
     addBtn.disabled = !hasTextSelection(ed);
   };
@@ -103,18 +130,23 @@ async function main(): Promise<void> {
   syncAddBtn();
 
   addBtn.addEventListener('click', () => {
-    const id = addComment(app.ed);
-    if (id) {
-      app.focusReplyFor = id; // focus its reply box once the sidebar re-renders
-      rerender(app);
-    }
+    // Allocate an id free across BOTH the store and the document's anchors, since
+    // the store thread is created lazily on the first reply.
+    const inUse = [
+      ...app.threads.map((t) => t.id),
+      ...extractAnchors(currentMarkdown(app.ed)).map((a) => a.id),
+    ];
+    const id = nextThreadId(inUse);
+    if (!applyAnchor(app.ed, id)) return; // no selection (button should be disabled)
+    app.focusReplyFor = id; // focus its reply box once the sidebar re-renders
+    void rerender(app);
   });
 
   const commitBtn = document.getElementById('commit') as HTMLButtonElement | null;
   if (commitBtn) wireCommit(ed, commitBtn);
 
-  // "Reload" pulls the latest committed doc (e.g. after Claude's turn) and
-  // re-derives the view against the previous commit.
+  // "Reload" pulls the latest committed doc (e.g. after Claude's turn) and the
+  // latest store, then re-derives the view against the previous commit.
   const reloadBtn = document.getElementById('reload') as HTMLButtonElement | null;
   if (reloadBtn) {
     reloadBtn.addEventListener('click', async () => {
@@ -123,20 +155,21 @@ async function main(): Promise<void> {
         const next = await loadState();
         loadMarkdown(app.ed, next.current);
         app.baselineMd = next.baseline;
-        rerender(app);
+        if (app.usingStore) app.threads = await fetchThreads();
+        await rerender(app);
       } finally {
         reloadBtn.disabled = false;
       }
     });
   }
 
-  rerender(app);
+  await rerender(app);
 }
 
 /**
  * Commit the current document state to the workspace git repo (commit == turn).
- * Serialises the live doc via the M0 path and POSTs it to the dev-server
- * `/commit` endpoint (see vite.config.ts), which writes it and git-commits.
+ * Serialises the live doc via the M0 path and POSTs it to `/commit`, which renders
+ * the turn (reading the store) and git-commits the doc.
  */
 function wireCommit(ed: DocloopEditor, btn: HTMLButtonElement): void {
   const label = btn.textContent;
@@ -162,28 +195,74 @@ function wireCommit(ed: DocloopEditor, btn: HTMLButtonElement): void {
   });
 }
 
+/** Append a comment to a thread, via the store or (offline) in-memory. */
+async function postReply(app: App, id: string, body: string): Promise<void> {
+  if (app.usingStore) {
+    await replyThread(id, body);
+    app.threads = await fetchThreads();
+    return;
+  }
+  // Offline demo: mutate the cached store so the sidebar still updates.
+  const now = new Date().toISOString();
+  const existing = app.threads.find((t) => t.id === id);
+  if (existing) {
+    const seq = existing.comments.length
+      ? existing.comments[existing.comments.length - 1].seq + 1
+      : 1;
+    existing.comments.push({ seq, author: 'rjs', created: now, body });
+  } else {
+    app.threads.push({ id, comments: [{ seq: 1, author: 'rjs', created: now, body }] });
+  }
+}
+
+/** Resolve a thread: drop its store directory, via the store or (offline) in-memory. */
+async function deleteThread(app: App, id: string): Promise<void> {
+  if (app.usingStore) {
+    await resolveThread(id);
+    app.threads = await fetchThreads();
+  } else {
+    app.threads = app.threads.filter((t) => t.id !== id);
+  }
+}
+
 /** Re-derive decorations + sidebar + changes panel from the current state. */
-function rerender(app: App): void {
+async function rerender(app: App): Promise<void> {
   const { ed } = app;
 
-  // 1. Decorations: diff live doc vs the (mutable) baseline + mark highlights.
+  // 1. Decorations: diff live doc vs the (mutable) baseline + anchor highlights.
   const baselineDoc = ed.parse(app.baselineMd);
   const liveDoc = ed.view.state.doc;
   const set = buildReadViewDecorations(baselineDoc, liveDoc);
   ed.view.dispatch(ed.view.state.tr.setMeta(decoPluginKey, set));
 
-  // 2. Sidebar threads + 3. changes, both derived from the current markdown.
+  // 2. Sidebar (anchors joined with store comments) + 3. changes panel.
   const md = currentMarkdown(ed);
-  renderThreads(app, extractThreads(md));
+  await renderThreads(app, extractAnchors(md));
   renderChanges(app, listHunks(app.baselineMd, md));
 }
 
-/** Render the threads sidebar: each thread gets a reply box + Resolve button. */
-function renderThreads(app: App, threads: Thread[]): void {
+/** Render one comment body as a read-only Milkdown instance inside `host`. */
+async function renderComment(app: App, host: HTMLElement, body: string): Promise<void> {
+  const mount = document.createElement('div');
+  mount.className = 'comment-body';
+  host.appendChild(mount);
+  const ed = await createEditor(mount, body, { editable: false });
+  app.commentEditors.push(ed);
+}
+
+/**
+ * Render the threads sidebar: each document anchor, its store comments (read-only
+ * Milkdown), a reply box, and a Resolve button.
+ */
+async function renderThreads(app: App, anchors: Anchor[]): Promise<void> {
+  // Tear down the previous render's comment editors before rebuilding.
+  await Promise.all(app.commentEditors.map((e) => e.destroy()));
+  app.commentEditors = [];
+
   const host = app.els.threads;
   host.replaceChildren();
 
-  if (threads.length === 0) {
+  if (anchors.length === 0) {
     const empty = document.createElement('li');
     empty.className = 'muted';
     empty.textContent = 'No comment threads.';
@@ -191,10 +270,13 @@ function renderThreads(app: App, threads: Thread[]): void {
     return;
   }
 
-  threads.forEach((t, i) => {
+  const byId = new Map(app.threads.map((t) => [t.id, t]));
+
+  for (let i = 0; i < anchors.length; i++) {
+    const a = anchors[i];
     const li = document.createElement('li');
     li.className = 'thread';
-    li.dataset.thread = t.id;
+    li.dataset.thread = a.id;
 
     const head = document.createElement('div');
     head.className = 'thread-head';
@@ -204,35 +286,45 @@ function renderThreads(app: App, threads: Thread[]): void {
     badge.textContent = String(i + 1);
     head.appendChild(badge);
 
-    const anchor = document.createElement('span');
-    anchor.className = 'thread-anchor';
-    anchor.textContent = t.anchor ? `“${t.anchor}”` : '(no anchor)';
-    head.appendChild(anchor);
+    const anchorEl = document.createElement('span');
+    anchorEl.className = 'thread-anchor';
+    anchorEl.textContent = a.text ? `“${a.text}”` : '(block anchor)';
+    head.appendChild(anchorEl);
 
     const resolveBtn = document.createElement('button');
     resolveBtn.className = 'btn btn-resolve';
     resolveBtn.textContent = 'Resolve';
     resolveBtn.title = 'Unwrap the anchor and delete this thread';
-    resolveBtn.addEventListener('click', () => {
-      resolveAction(app.ed, t.id);
-      rerender(app);
+    resolveBtn.addEventListener('click', async () => {
+      removeAnchor(app.ed, a.id); // document side
+      await deleteThread(app, a.id); // store side
+      await rerender(app);
     });
     head.appendChild(resolveBtn);
     li.appendChild(head);
 
-    const body = document.createElement('div');
-    if (t.body === null || t.body === '') {
-      body.className = 'thread-body muted';
-      body.textContent = t.body === '' ? '(no replies yet)' : '(orphan anchor — no thread body)';
+    // Comment bodies (read-only Milkdown), in sequence order.
+    const comments = byId.get(a.id)?.comments ?? [];
+    const bodyHost = document.createElement('div');
+    bodyHost.className = 'thread-body';
+    li.appendChild(bodyHost);
+    if (comments.length === 0) {
+      const none = document.createElement('div');
+      none.className = 'muted';
+      none.textContent = '(no replies yet)';
+      bodyHost.appendChild(none);
     } else {
-      body.className = 'thread-body';
-      // Replies are <br>-joined in storage; show each turn on its own line.
-      splitTurns(t.body).forEach((turn, j) => {
-        if (j > 0) body.appendChild(document.createElement('br'));
-        body.appendChild(document.createTextNode(turn));
-      });
+      for (const c of comments) {
+        const item = document.createElement('div');
+        item.className = 'comment';
+        const meta = document.createElement('span');
+        meta.className = 'comment-meta';
+        meta.textContent = c.author;
+        item.appendChild(meta);
+        bodyHost.appendChild(item);
+        await renderComment(app, item, c.body);
+      }
     }
-    li.appendChild(body);
 
     // Reply box.
     const form = document.createElement('form');
@@ -247,19 +339,20 @@ function renderThreads(app: App, threads: Thread[]): void {
     send.className = 'btn';
     send.textContent = 'Reply';
     form.appendChild(send);
-    form.addEventListener('submit', (e) => {
+    form.addEventListener('submit', async (e) => {
       e.preventDefault();
       const text = input.value.trim();
       if (!text) return;
-      replyAction(app.ed, t.id, text);
-      rerender(app);
+      app.focusReplyFor = a.id;
+      await postReply(app, a.id, text);
+      await rerender(app);
     });
     li.appendChild(form);
 
     host.appendChild(li);
 
-    if (app.focusReplyFor === t.id) input.focus();
-  });
+    if (app.focusReplyFor === a.id) input.focus();
+  }
 
   app.focusReplyFor = null;
 }
@@ -294,7 +387,7 @@ function renderChanges(app: App, hunks: Hunk[]): void {
     accept.addEventListener('click', () => {
       // Accept advances the baseline; the live doc is unchanged.
       app.baselineMd = acceptHunk(app.baselineMd, currentMarkdown(app.ed), h.index);
-      rerender(app);
+      void rerender(app);
     });
     li.appendChild(accept);
 
@@ -306,7 +399,7 @@ function renderChanges(app: App, hunks: Hunk[]): void {
       // Reject rewrites the live doc back to the baseline for this span.
       const reverted = rejectHunk(app.baselineMd, currentMarkdown(app.ed), h.index);
       loadMarkdown(app.ed, reverted);
-      rerender(app);
+      void rerender(app);
     });
     li.appendChild(reject);
 

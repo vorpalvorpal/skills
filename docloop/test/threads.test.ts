@@ -1,53 +1,60 @@
 import { describe, it, expect } from 'vitest';
-import { extractThreads, splitTurns } from '../src/threads';
+import { extractAnchors, unwrapAnchor, nextThreadId } from '../src/threads';
 
-describe('extractThreads', () => {
-  it('joins a <mark> anchor with its <article> body by data-thread id', () => {
-    const md = [
-      'A sentence with a <mark data-thread="t1">commented span</mark> in it.',
-      '',
-      '---',
-      '',
-      '<article data-thread="t1">the thread body</article>',
-    ].join('\n');
-    expect(extractThreads(md)).toEqual([
-      { id: 't1', anchor: 'commented span', body: 'the thread body' },
-    ]);
+describe('extractAnchors', () => {
+  it('extracts an inline :mark anchor with its id and span text', () => {
+    const md = 'A sentence with a :mark[commented span]{#t1} in it.';
+    expect(extractAnchors(md)).toEqual([{ id: 't1', text: 'commented span' }]);
   });
 
-  it('returns threads in document order of their anchors', () => {
-    const md = [
-      '<mark data-thread="t2">second</mark> then <mark data-thread="t1">first</mark>.',
-      '',
-      '---',
-      '<article data-thread="t1">b1</article>',
-      '<article data-thread="t2">b2</article>',
-    ].join('\n');
-    expect(extractThreads(md).map((t) => t.id)).toEqual(['t2', 't1']);
+  it('returns anchors in document order', () => {
+    const md = ':mark[second]{#t2} then :mark[first]{#t1}.';
+    expect(extractAnchors(md).map((a) => a.id)).toEqual(['t2', 't1']);
   });
 
-  it('reports an orphan mark (no matching article) with body null', () => {
-    const md = 'An <mark data-thread="t9">orphan</mark> mark.';
-    expect(extractThreads(md)).toEqual([
-      { id: 't9', anchor: 'orphan', body: null },
-    ]);
+  it('coalesces same-id pieces of a span split by inline formatting', () => {
+    // A span crossing formatting serialises as repeated same-id directives.
+    const md = 'see :mark[the]{#t1}:mark[claim]{#t1} here';
+    expect(extractAnchors(md)).toEqual([{ id: 't1', text: 'the claim' }]);
+  });
+
+  it('reports a container anchor by id with empty text', () => {
+    const md = ':::mark{#t9}\n\nA whole block.\n\n:::';
+    expect(extractAnchors(md)).toEqual([{ id: 't9', text: '' }]);
   });
 });
 
-describe('splitTurns', () => {
-  it('splits a <br>-joined body into trimmed turns', () => {
-    expect(splitTurns('t1 open.<br>rjs: source?<br>C: added.')).toEqual([
-      't1 open.',
-      'rjs: source?',
-      'C: added.',
-    ]);
+describe('unwrapAnchor', () => {
+  it('unwraps an inline anchor to plain text, leaving others intact', () => {
+    const md = 'X :mark[a]{#t1} Y :mark[b]{#t2}.';
+    const out = unwrapAnchor(md, 't1');
+    expect(out).toBe('X a Y :mark[b]{#t2}.');
   });
 
-  it('returns a single turn when there are no <br> separators', () => {
-    expect(splitTurns('just one note')).toEqual(['just one note']);
+  it('unwraps a container anchor to its blocks', () => {
+    const md = ':::mark{#t1}\nblock body\n:::';
+    expect(unwrapAnchor(md, 't1')).toBe('block body');
   });
 
-  it('tolerates <br/> and <br /> variants and drops empty turns', () => {
-    expect(splitTurns('a<br/>b<br />c<br>')).toEqual(['a', 'b', 'c']);
+  it('unwraps a LATER anchor without swallowing earlier ones', () => {
+    // Regression: an id-specific closer `]{#t3}` must not let the body cross t1/t2.
+    const md = 'a :mark[one]{#t1} b :mark[two]{#t2} c :mark[three]{#t3} d';
+    expect(unwrapAnchor(md, 't3')).toBe('a :mark[one]{#t1} b :mark[two]{#t2} c three d');
+    // and the earlier anchors are still individually extractable + unwrappable
+    expect(extractAnchors(unwrapAnchor(md, 't3')).map((x) => x.id)).toEqual(['t1', 't2']);
+  });
+});
+
+describe('nextThreadId', () => {
+  it('allocates t1 when nothing is in use', () => {
+    expect(nextThreadId([])).toBe('t1');
+  });
+
+  it('allocates max+1 across store and anchor ids', () => {
+    expect(nextThreadId(['t1', 't3', 't2'])).toBe('t4');
+  });
+
+  it('ignores ids that do not match the t<N> scheme', () => {
+    expect(nextThreadId(['weird', 't2'])).toBe('t3');
   });
 });

@@ -20,8 +20,9 @@
  * in node tests and could run in the MCP later. A local model to classify/rank
  * deltas is parked as a future refinement, not v0.
  */
-import { computeDiff, splitFoot } from './diff';
-import { extractThreads, splitTurns } from './threads';
+import { computeDiff } from './diff';
+import { extractAnchors } from './threads';
+import type { Thread } from './threads-store';
 
 /** A heading found in the body, with the char offset where its line starts. */
 interface Heading {
@@ -52,12 +53,15 @@ function headingAt(headings: Heading[], offset: number): string | null {
 }
 
 /**
- * Strip `<mark data-thread="…">TEXT</mark>` anchors to plain `TEXT`. The edit diff
+ * Strip comment-anchor directives to their plain text — inline `:mark[TEXT]{#id}`
+ * -> `TEXT` and container `:::mark{#id}\nBLOCKS\n:::` -> `BLOCKS`. The edit diff
  * runs on the *unwrapped* body so annotation scaffolding never appears as `<ins>`/
  * `<del>` — the thread itself is already surfaced in the `<threads>` group.
  */
 function unwrapMarks(md: string): string {
-  return md.replace(/<mark\s+data-thread="[^"]*">([\s\S]*?)<\/mark>/g, '$1');
+  return md
+    .replace(/:mark\[([\s\S]*?)\]\{#[^}]+\}/g, '$1')
+    .replace(/:::mark\{#[^}]+\}\n([\s\S]*?)\n:::/g, '$1');
 }
 
 /** Minimal XML text/attr escaping. */
@@ -112,28 +116,32 @@ function renderSections(wrapper: string, items: SectionItem[]): string {
  *
  * Returns an XML string with two top-level groups, **threads first** then
  * **edits**, each grouped into `<section heading="…">` blocks by the enclosing
- * heading. Threads come from the `<mark>`/`<article>` storage; edits come from the
- * body word-diff (the foot-region is excluded — threads never appear as edits).
+ * heading. Threads are the document's `:mark` anchors joined with their comment
+ * bodies from the sidecar `store` (one `<reply>` per comment); edits come from the
+ * body word-diff. `store` defaults to `[]`, so a caller without the store (or a
+ * doc with no comments) still gets the anchors, just with no replies.
  */
-export function renderTurn(oldMarkdown: string, newMarkdown: string): string {
-  // Threads need the body *with* marks (to locate anchors by id); edits run on
-  // the unwrapped body so mark scaffolding never shows up as a change.
-  const threadBody = splitFoot(newMarkdown).body;
-  const threadHeadings = headingsOf(threadBody);
+export function renderTurn(
+  oldMarkdown: string,
+  newMarkdown: string,
+  store: Thread[] = [],
+): string {
+  // Anchors live in the document; locate them by id to pick their section. Edits
+  // run on the unwrapped body so anchor scaffolding never shows up as a change.
+  const threadHeadings = headingsOf(newMarkdown);
   const editNew = unwrapMarks(newMarkdown);
-  const editBody = splitFoot(editNew).body;
-  const editHeadings = headingsOf(editBody);
+  const editHeadings = headingsOf(editNew);
+  const commentsById = new Map(store.map((t) => [t.id, t.comments]));
 
-  // --- Threads (open items): one <thread> per live <mark>, in document order. ---
+  // --- Threads (open items): one <thread> per live anchor, in document order. ---
   const threadItems: SectionItem[] = [];
-  for (const t of extractThreads(newMarkdown)) {
-    // Locate the anchor in the body to pick its enclosing section. Orphan bodies
-    // (no <mark>) fall back to the preamble.
-    const at = threadBody.indexOf(`data-thread="${t.id}"`);
+  for (const a of extractAnchors(newMarkdown)) {
+    // Locate the anchor in the doc to pick its enclosing section.
+    const at = newMarkdown.indexOf(`{#${a.id}}`);
     const heading = at >= 0 ? headingAt(threadHeadings, at) : null;
 
-    const attrs = t.anchor ? ` anchor="${esc(t.anchor)}"` : '';
-    const replies = t.body ? splitTurns(t.body) : [];
+    const attrs = a.text ? ` anchor="${esc(a.text)}"` : '';
+    const replies = (commentsById.get(a.id) ?? []).map((c) => c.body);
     const inner =
       replies.length === 0
         ? ''
@@ -142,7 +150,7 @@ export function renderTurn(oldMarkdown: string, newMarkdown: string): string {
           '\n      ';
     threadItems.push({
       heading,
-      xml: `<thread id="${esc(t.id)}"${attrs}>${inner}</thread>`,
+      xml: `<thread id="${esc(a.id)}"${attrs}>${inner}</thread>`,
     });
   }
 

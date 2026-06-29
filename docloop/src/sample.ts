@@ -1,41 +1,58 @@
 /**
- * Sample documents for the read-view demo and the integration test.
+ * Sample documents + sample comment store for the read/write-view demo and the
+ * integration tests.
  *
  * `OLD_MD` is the previous version, `NEW_MD` is "Claude's edit". They differ in
- * the body (an insertion and a deletion) and both carry a `<mark>` comment
- * anchor + matching `<article>` foot-region thread, so the demo exercises every
- * read-view feature: insert decoration, delete widget, and a sidebar thread.
+ * the body (an insertion and a deletion) and both carry a `:mark` comment anchor,
+ * so the demo exercises every read-view feature: insert decoration, delete widget,
+ * and a sidebar thread. Comment *bodies* are no longer in the document — they live
+ * in the sidecar store; `SAMPLE_THREADS` is the offline stand-in the GUI shows
+ * when no dev-server `/threads` endpoint is reachable (a static build / fresh
+ * checkout), keyed to the `#t1` anchor.
  *
- * Body diff (above the final `---`):
+ * Body diff:
  *   - inserted: "brown " before "fox"  (one inserted word)
- *   - deleted:  "lazy "   before "dog" (one deleted word)
- * The foot-region `<article>` differs too — and must NOT diff (foot-region rule).
+ *   - deleted:  "lazy "  before "dog"  (one deleted word)
  */
+import type { StoreThread } from './threads-client';
 
 export const OLD_MD = [
   '# Field notes',
   '',
   'The quick fox jumped over the lazy dog while we watched from the',
-  'ridge with a <mark data-thread="t1">questionable claim</mark> about its speed.',
+  'ridge with a :mark[questionable claim]{#t1} about its speed.',
   '',
   '- observed at dawn',
   '- weather was clear',
-  '',
-  '---',
-  '',
-  '<article data-thread="t1">t1 open.<br>rjs: source for the speed claim?</article>',
 ].join('\n');
 
 export const NEW_MD = [
   '# Field notes',
   '',
   'The quick brown fox jumped over the dog while we watched from the',
-  'ridge with a <mark data-thread="t1">questionable claim</mark> about its speed.',
+  'ridge with a :mark[questionable claim]{#t1} about its speed.',
   '',
   '- observed at dawn',
   '- weather was clear',
-  '',
-  '---',
-  '',
-  '<article data-thread="t1">t1 open.<br>rjs: source for the speed claim?<br>C: added, see field log p.4.</article>',
 ].join('\n');
+
+/** Offline stand-in for the `/threads` store, keyed to the `#t1` anchor. */
+export const SAMPLE_THREADS: StoreThread[] = [
+  {
+    id: 't1',
+    comments: [
+      {
+        seq: 1,
+        author: 'rjs',
+        created: '2026-06-29T09:00:00.000Z',
+        body: 'Source for the speed claim?',
+      },
+      {
+        seq: 2,
+        author: 'C',
+        created: '2026-06-29T09:05:00.000Z',
+        body: 'Added — see field log p.4.',
+      },
+    ],
+  },
+];

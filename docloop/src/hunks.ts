@@ -7,11 +7,10 @@
  * draws one decoration per hunk; these helpers let the user resolve one at a
  * time.
  *
- * Both operations are pure markdown→markdown string transforms working on the
- * **body** (above the final `---`); the foot-region is split off and re-attached
- * untouched, so threads are never disturbed. They reconstruct the body by
- * walking the diff segments and choosing, per hunk, the old or new side — the
- * same equal/insert/delete vocabulary diff.ts already pins.
+ * Both operations are pure markdown→markdown string transforms over the whole
+ * document (there is no longer a foot-region — threads live in the sidecar store).
+ * They reconstruct the text by walking the diff segments and choosing, per hunk,
+ * the old or new side — the same equal/insert/delete vocabulary diff.ts pins.
  *
  *   - **reject(k)** reverts hunk k in the *live* doc: the inserted text is
  *     dropped, or the deleted text is restored — so that span returns to the
@@ -26,7 +25,7 @@
  * changes on accept (the text is already what the user wants), and the diff
  * simply stops flagging that span on the next re-derive.
  */
-import { computeDiff, splitFoot, type DiffSegment } from './diff';
+import { computeDiff, type DiffSegment } from './diff';
 
 /** The hunks in a body diff, with their kind, for building UI controls. */
 export interface Hunk {
@@ -61,46 +60,40 @@ function withHunkIndex(
 
 /**
  * Reject hunk `k`: return new live markdown with that hunk reverted to baseline.
- * The body is rebuilt from the diff (insert k dropped / delete k restored); the
- * live doc's own foot-region is re-attached unchanged.
+ * The document is rebuilt from the diff — the rejected insertion is dropped, or
+ * the rejected deletion restored — while every other hunk stays as it was.
  */
 export function rejectHunk(oldMd: string, newMd: string, k: number): string {
   const segs = withHunkIndex(oldMd, newMd);
-  let body = '';
+  let out = '';
   for (const seg of segs) {
-    if (seg.type === 'equal') body += seg.value;
+    if (seg.type === 'equal') out += seg.value;
     else if (seg.type === 'insert') {
-      if (seg.hunk !== k) body += seg.value; // drop the rejected insertion
+      if (seg.hunk !== k) out += seg.value; // drop the rejected insertion
     } else {
       // delete: present in old, absent in new. Restore it iff this is the hunk.
-      if (seg.hunk === k) body += seg.value;
+      if (seg.hunk === k) out += seg.value;
     }
   }
-  return reattach(body, newMd);
+  return out;
 }
 
 /**
  * Accept hunk `k`: return new baseline markdown with that hunk applied. The
- * baseline body is rebuilt (insert k added / delete k removed); the baseline's
- * own foot-region is re-attached unchanged.
+ * baseline is rebuilt — the accepted insertion is added, or the accepted deletion
+ * removed — so that hunk no longer diffs while the others still do.
  */
 export function acceptHunk(oldMd: string, newMd: string, k: number): string {
   const segs = withHunkIndex(oldMd, newMd);
-  let body = '';
+  let out = '';
   for (const seg of segs) {
-    if (seg.type === 'equal') body += seg.value;
+    if (seg.type === 'equal') out += seg.value;
     else if (seg.type === 'delete') {
-      if (seg.hunk !== k) body += seg.value; // keep un-accepted deletions in baseline
+      if (seg.hunk !== k) out += seg.value; // keep un-accepted deletions in baseline
     } else {
       // insert: absent from old. Add it to the baseline iff this is the hunk.
-      if (seg.hunk === k) body += seg.value;
+      if (seg.hunk === k) out += seg.value;
     }
   }
-  return reattach(body, oldMd);
-}
-
-/** Re-attach `source`'s foot-region to a freshly rebuilt `body`. */
-function reattach(body: string, source: string): string {
-  const { foot } = splitFoot(source);
-  return foot ? `${body}\n${foot}` : body;
+  return out;
 }
