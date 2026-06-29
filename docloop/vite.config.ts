@@ -91,10 +91,19 @@ function docloopEndpoints(): Plugin {
             const prevMd = (await showDoc('HEAD')) ?? '';
             await mkdir(threadsDir, { recursive: true });
             const store = await listThreads(threadsDir);
-            await writeFile(turnPath, renderTurn(prevMd, newMd, store), 'utf8');
+            // The previous commit's time bounds "added-to since last turn": a
+            // comment created after it is new this turn. Null on the first commit.
+            const sinceIso = await git('show', '-s', '--format=%cI', 'HEAD')
+              .then(({ stdout }) => stdout.trim())
+              .catch(() => null);
+            await writeFile(turnPath, renderTurn(prevMd, newMd, store, sinceIso), 'utf8');
 
             await writeFile(docPath, newMd, 'utf8');
-            await git('add', 'doc.md');
+            // Commit BOTH the doc and the sidecar store, so a turn that only
+            // touches threads (e.g. a reply, no doc edit) still advances HEAD —
+            // otherwise the previous-commit time wouldn't move and that reply
+            // would be re-reported as "updated" on the next turn.
+            await git('add', 'doc.md', 'threads');
             let committed = true;
             await git('commit', '-q', '-m', `turn @ ${new Date().toISOString()}`).catch(() => {
               committed = false; // nothing staged — no change since the last commit
