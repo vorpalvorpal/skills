@@ -182,6 +182,12 @@ async function main(): Promise<void> {
   }
 
   await rerender(app);
+
+  // Re-layout the margin gutter when the doc reflows (typing, wrapping, font
+  // load) or the window resizes — anchor positions move, cards must follow.
+  // Attached AFTER the first render so the observer can't fire mid-render.
+  new ResizeObserver(() => scheduleLayout(app)).observe(ed.view.dom);
+  window.addEventListener('resize', () => scheduleLayout(app));
 }
 
 /**
@@ -258,6 +264,69 @@ async function rerender(app: App): Promise<void> {
   await renderThreads(app, extractAnchors(md));
   // Content edits only — opening/closing a thread is not an approvable change.
   renderChanges(app, listContentHunks(app.baselineMd, md));
+
+  // 4. Position the thread cards beside their anchors. renderThreads is awaited,
+  // so the cards (and their comment editors) are in the DOM and measurable now —
+  // lay out synchronously rather than racing a rAF against the async renders.
+  layoutThreadCards(app);
+}
+
+/** Pending rAF handle, so many layout triggers coalesce into one pass. */
+let layoutPending = 0;
+
+/** Re-position the thread cards on the next frame (after the DOM has settled). */
+function scheduleLayout(app: App): void {
+  if (layoutPending) return;
+  layoutPending = requestAnimationFrame(() => {
+    layoutPending = 0;
+    layoutThreadCards(app);
+  });
+}
+
+/**
+ * Margin layout: place each thread card at its anchor's vertical position in the
+ * doc, but never above the previous card — so cards stack downward and never
+ * overlap (the one whose anchor is higher wins the spot; the next slides below
+ * it). The Changes panel reserves the top, and the gutter is grown to the lowest
+ * card so the page scrolls to reveal it. Re-run on every open/close/expand/resize.
+ */
+function layoutThreadCards(app: App): void {
+  const gutter = app.els.threads;
+  const sidebar = gutter.closest('.sidebar') as HTMLElement | null;
+  const cards = Array.from(gutter.querySelectorAll<HTMLElement>('.thread'));
+  if (!sidebar) return;
+  if (cards.length === 0) {
+    sidebar.style.minHeight = '';
+    return;
+  }
+
+  const originTop = sidebar.getBoundingClientRect().top;
+  const editorDom = app.ed.view.dom;
+
+  // Each card's desired top = its anchor's offset from the gutter origin.
+  const placed = cards
+    .map((card) => {
+      const id = card.dataset.thread ?? '';
+      const anchorEl =
+        editorDom.querySelector<HTMLElement>(`.docloop-mark[data-thread="${id}"]`) ??
+        editorDom.querySelector<HTMLElement>(`.docloop-badge[data-thread="${id}"]`);
+      const y = anchorEl
+        ? anchorEl.getBoundingClientRect().top - originTop
+        : Number.POSITIVE_INFINITY;
+      return { card, y };
+    })
+    .sort((a, b) => a.y - b.y);
+
+  const GAP = 8;
+  // Reserve the space behind the Changes panel so a top card isn't hidden by it.
+  const changesPanel = sidebar.querySelector<HTMLElement>('.changes-panel');
+  let cursor = changesPanel ? changesPanel.offsetHeight + GAP : 0;
+  for (const { card, y } of placed) {
+    const top = Math.max(Number.isFinite(y) ? y : cursor, cursor);
+    card.style.top = `${top}px`;
+    cursor = top + card.offsetHeight + GAP;
+  }
+  sidebar.style.minHeight = `${cursor}px`;
 }
 
 /**
@@ -368,6 +437,7 @@ async function renderThreads(app: App, anchors: Anchor[]): Promise<void> {
       caret.textContent = nowCollapsed ? '▸' : '▾';
       if (nowCollapsed) app.expanded.delete(a.id);
       else app.expanded.add(a.id);
+      scheduleLayout(app); // height changed → restack the gutter
     });
     li.appendChild(head);
 
