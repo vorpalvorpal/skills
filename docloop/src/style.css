@@ -126,6 +126,27 @@ body {
   align-items: center;
   gap: 0.4rem;
   margin-bottom: 0.3rem;
+  cursor: pointer;
+  user-select: none;
+}
+.thread-caret {
+  color: var(--muted);
+  width: 0.8rem;
+  flex: none;
+  font-size: 0.7rem;
+}
+.thread-count {
+  color: var(--muted);
+  font-size: 0.7rem;
+  white-space: nowrap;
+}
+/* Collapsed: keep just the header row; hide the comments + reply box. */
+.thread.collapsed .thread-body,
+.thread.collapsed .reply-form {
+  display: none;
+}
+.thread.collapsed .thread-head {
+  margin-bottom: 0;
 }
 .thread-badge {
   display: inline-flex;

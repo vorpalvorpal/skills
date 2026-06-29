@@ -131,7 +131,13 @@ function docloopEndpoints(): Plugin {
             if (current === null) return send(res, 200, { ok: true, present: false });
             // baseline: the commit before HEAD (null if HEAD is the first commit).
             const baseline = await showDoc('HEAD~1');
-            send(res, 200, { ok: true, present: true, current, baseline });
+            // baselineIso: HEAD~1's commit time as UTC — the boundary of "the last
+            // turn" (current is HEAD; the last turn is HEAD~1 → HEAD), so the GUI
+            // can tell which comments arrived this turn. Null if HEAD is the first.
+            const baselineIso = await git('show', '-s', '--format=%ct', 'HEAD~1')
+              .then(({ stdout }) => new Date(Number(stdout.trim()) * 1000).toISOString())
+              .catch(() => null);
+            send(res, 200, { ok: true, present: true, current, baseline, baselineIso });
           } catch (err) {
             send(res, 500, { ok: false, error: String(err) });
           }
