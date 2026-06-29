@@ -21,8 +21,8 @@
  * deltas is parked as a future refinement, not v0.
  */
 import { computeDiff } from './diff';
-import { extractAnchors } from './threads';
-import type { Thread } from './threads-store';
+import { extractAnchors, stripAnchors } from './threads';
+import type { Thread, Comment } from './threads-store';
 
 /** A heading found in the body, with the char offset where its line starts. */
 interface Heading {
@@ -52,17 +52,9 @@ function headingAt(headings: Heading[], offset: number): string | null {
   return found;
 }
 
-/**
- * Strip comment-anchor directives to their plain text — inline `:mark[TEXT]{#id}`
- * -> `TEXT` and container `:::mark{#id}\nBLOCKS\n:::` -> `BLOCKS`. The edit diff
- * runs on the *unwrapped* body so annotation scaffolding never appears as `<ins>`/
- * `<del>` — the thread itself is already surfaced in the `<threads>` group.
- */
-function unwrapMarks(md: string): string {
-  return md
-    .replace(/:mark\[([\s\S]*?)\]\{#[^}]+\}/g, '$1')
-    .replace(/:::mark\{#[^}]+\}\n([\s\S]*?)\n:::/g, '$1');
-}
+// Edits run on the anchor-stripped body (via stripAnchors) so annotation
+// scaffolding never appears as <ins>/<del> — the thread itself is already
+// surfaced in the <threads> group.
 
 /** Minimal XML text/attr escaping. */
 function esc(s: string): string {
@@ -111,47 +103,82 @@ function renderSections(wrapper: string, items: SectionItem[]): string {
   return `  <${wrapper}>\n${sections.join('\n')}\n  </${wrapper}>`;
 }
 
+/** Build one `<thread>` element with its full current state (all replies). */
+function threadEl(id: string, anchor: string, status: string, comments: Comment[]): string {
+  const attrs = `${anchor ? ` anchor="${esc(anchor)}"` : ''} status="${status}"`;
+  const replies = comments.map((c) => c.body);
+  const inner =
+    replies.length === 0
+      ? ''
+      : '\n' +
+        replies.map((r) => `        <reply>${esc(r)}</reply>`).join('\n') +
+        '\n      ';
+  return `<thread id="${esc(id)}"${attrs}>${inner}</thread>`;
+}
+
 /**
  * Render the turn Claude reads for the step from `oldMarkdown` to `newMarkdown`.
  *
  * Returns an XML string with two top-level groups, **threads first** then
  * **edits**, each grouped into `<section heading="…">` blocks by the enclosing
- * heading. Threads are the document's `:mark` anchors joined with their comment
- * bodies from the sidecar `store` (one `<reply>` per comment); edits come from the
- * body word-diff. `store` defaults to `[]`, so a caller without the store (or a
- * doc with no comments) still gets the anchors, just with no replies.
+ * heading.
+ *
+ * The `<threads>` group is a **delta at thread granularity**: a thread appears
+ * only if it CHANGED on this turn — `status="opened"` (anchor new since
+ * `oldMarkdown`), `status="updated"` (a comment was added since `sinceIso`, the
+ * previous commit's time), or `status="resolved"` (anchor gone since
+ * `oldMarkdown`). A changed thread carries its FULL current state (every reply);
+ * unchanged threads are omitted so they aren't re-sent every turn. `sinceIso`
+ * absent ⇒ treat every thread with comments as freshly updated (first turn).
+ * `store` (the sidecar comments) defaults to `[]`.
+ *
+ * Edits come from the body word-diff and are always a true delta.
  */
 export function renderTurn(
   oldMarkdown: string,
   newMarkdown: string,
   store: Thread[] = [],
+  sinceIso?: string | null,
 ): string {
-  // Anchors live in the document; locate them by id to pick their section. Edits
-  // run on the unwrapped body so anchor scaffolding never shows up as a change.
   const threadHeadings = headingsOf(newMarkdown);
-  const editNew = unwrapMarks(newMarkdown);
+  const editNew = stripAnchors(newMarkdown);
   const editHeadings = headingsOf(editNew);
   const commentsById = new Map(store.map((t) => [t.id, t.comments]));
 
-  // --- Threads (open items): one <thread> per live anchor, in document order. ---
+  const prevAnchors = extractAnchors(oldMarkdown);
+  const prevIds = new Set(prevAnchors.map((a) => a.id));
+  const newAnchors = extractAnchors(newMarkdown);
+  const newIds = new Set(newAnchors.map((a) => a.id));
+
+  // Compare as instants, NOT strings: `created` is UTC ('…Z') but git's %cI is a
+  // local offset ('…+10:00'), so a lexical compare is wrong across time zones.
+  const sinceMs = sinceIso ? Date.parse(sinceIso) : NaN;
+
+  // --- Threads: only those changed this turn, each with full current state. ---
   const threadItems: SectionItem[] = [];
-  for (const a of extractAnchors(newMarkdown)) {
-    // Locate the anchor in the doc to pick its enclosing section.
+
+  // Opened (new anchor) or updated (a comment added since the last commit).
+  for (const a of newAnchors) {
+    const comments = commentsById.get(a.id) ?? [];
+    const opened = !prevIds.has(a.id);
+    const updated = comments.some((c) => Number.isNaN(sinceMs) || Date.parse(c.created) > sinceMs);
+    if (!opened && !updated) continue; // unchanged since last turn — omit
     const at = newMarkdown.indexOf(`{#${a.id}}`);
     const heading = at >= 0 ? headingAt(threadHeadings, at) : null;
-
-    const attrs = a.text ? ` anchor="${esc(a.text)}"` : '';
-    const replies = (commentsById.get(a.id) ?? []).map((c) => c.body);
-    const inner =
-      replies.length === 0
-        ? ''
-        : '\n' +
-          replies.map((r) => `        <reply>${esc(r)}</reply>`).join('\n') +
-          '\n      ';
     threadItems.push({
       heading,
-      xml: `<thread id="${esc(a.id)}"${attrs}>${inner}</thread>`,
+      xml: threadEl(a.id, a.text, opened ? 'opened' : 'updated', comments),
     });
+  }
+
+  // Resolved (anchor present last turn, gone now). The store entry is deleted, so
+  // we report it as a marker; the anchor text comes from the previous doc.
+  const prevHeadings = headingsOf(oldMarkdown);
+  for (const a of prevAnchors) {
+    if (newIds.has(a.id)) continue;
+    const at = oldMarkdown.indexOf(`{#${a.id}}`);
+    const heading = at >= 0 ? headingAt(prevHeadings, at) : null;
+    threadItems.push({ heading, xml: threadEl(a.id, a.text, 'resolved', []) });
   }
 
   // --- Edits: word-diff of the body, each segment tagged with its section. ---
@@ -161,7 +188,7 @@ export function renderTurn(
   // reconstruct the new body, so the cursor stays accurate.)
   const editItems: SectionItem[] = [];
   let cursor = 0;
-  for (const seg of computeDiff(unwrapMarks(oldMarkdown), editNew)) {
+  for (const seg of computeDiff(stripAnchors(oldMarkdown), editNew)) {
     if (seg.type === 'equal') {
       cursor += seg.value.length;
       continue;
