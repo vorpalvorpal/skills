@@ -11,10 +11,9 @@ const fixture = readFileSync(join(here, 'fixtures', 'roundtrip.md'), 'utf8');
 // invariants discovered during M0. They must never replace the gate in
 // roundtrip.test.ts; they only pin extra guarantees the storage scheme relies on.
 describe('docloop storage invariants (supplementary to the M0 gate)', () => {
-  it('keeps the foot-region delimiter as a literal `---` (not `***`)', async () => {
-    // The storage scheme greps for a literal `---` before the <article>
-    // foot-region. remark-stringify defaults to `***`; src/roundtrip.ts pins
-    // `rule: '-'` so this stays `---`. Guard against that pin regressing.
+  it('keeps a thematic break as a literal `---` (not `***`)', async () => {
+    // src/roundtrip.ts pins `rule: '-'`; remark-stringify defaults to `***`.
+    // Guard against that pin regressing.
     const out = await roundTrip(fixture);
     expect(out).toMatch(/\n---\n/);
     expect(out).not.toMatch(/\n\*\*\*\n/);
@@ -36,16 +35,12 @@ describe('docloop storage invariants (supplementary to the M0 gate)', () => {
     expect(thrice).toBe(once);
   });
 
-  it('round-trips the anchor directive + raw-HTML values byte-for-byte', async () => {
-    // Stronger than the gate's substring checks: the exact anchor + the raw-HTML
-    // attribute text (quotes included) must survive.
+  it('round-trips the anchor directive + raw-HTML diff tags byte-for-byte', async () => {
+    // Stronger than the gate's substring checks: the exact anchor + raw-HTML
+    // tags must survive verbatim.
     const out = await roundTrip(fixture);
-    expect(out).toContain('data-thread="t1"');
     expect(out).toContain(':mark[commented span]{#t1}');
     expect(out).toContain('<ins>an inserted span</ins>');
     expect(out).toContain('<del>a deleted span</del>');
-    expect(out).toContain(
-      '<article data-thread="t1">t1 open. rjs: is this claim right? C: yes, see the source.</article>',
-    );
   });
 });

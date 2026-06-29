@@ -89,7 +89,9 @@ function docloopEndpoints(): Plugin {
             // so HEAD still points at the previous version. First commit -> diff
             // against empty.
             const prevMd = (await showDoc('HEAD')) ?? '';
-            await writeFile(turnPath, renderTurn(prevMd, newMd), 'utf8');
+            await mkdir(threadsDir, { recursive: true });
+            const store = await listThreads(threadsDir);
+            await writeFile(turnPath, renderTurn(prevMd, newMd, store), 'utf8');
 
             await writeFile(docPath, newMd, 'utf8');
             await git('add', 'doc.md');

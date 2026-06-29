@@ -29,11 +29,12 @@ describe('computeDiff', () => {
     expect(newFromSegs).toBe(newMd);
   });
 
-  it('ignores changes in the foot-region (at/below the final `---`)', () => {
-    const oldMd = 'Body text.\n\n---\n\n<article data-thread="t1">old thread</article>';
-    const newMd = 'Body text.\n\n---\n\n<article data-thread="t1">new thread, edited</article>';
+  it('diffs the whole document (no foot-region is excluded any more)', () => {
+    // Threads now live in the sidecar store, so there is nothing to exclude:
+    // every change in the string surfaces as a segment.
+    const oldMd = 'Body text. A note here.';
+    const newMd = 'Body text. A different note here.';
     const segs = computeDiff(oldMd, newMd);
-    expect(joined(segs, 'insert')).toBe('');
-    expect(joined(segs, 'delete')).toBe('');
+    expect(joined(segs, 'insert')).toContain('different');
   });
 });

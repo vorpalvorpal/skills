@@ -34,10 +34,4 @@ describe('M0 — Milkdown markdown round-trip (gate)', () => {
     expect(out).toContain('<ins>an inserted span</ins>');
     expect(out).toContain('<del>a deleted span</del>');
   });
-
-  it('preserves the <article> foot-region thread with its attribute', async () => {
-    const out = await roundTrip(fixture);
-    expect(out).toContain('<article data-thread="t1">');
-    expect(out).toContain('</article>');
-  });
 });

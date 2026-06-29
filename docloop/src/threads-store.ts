@@ -37,6 +37,12 @@
 
 import { mkdir, readdir, readFile, writeFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
+import { nextThreadId } from './threads';
+
+// Re-exported under the store's historical name so callers (vite.config.ts) keep
+// a single import surface. Id allocation lives in threads.ts because the browser
+// also needs it (anchor ids), and that module is filesystem-free.
+export { nextThreadId as newThreadId };
 
 /** A single comment in a thread, in sequence order within its thread. */
 export interface Comment {
@@ -57,21 +63,6 @@ const ID_RE = /^t(\d+)$/;
 
 /** Matches an `NNNN.md` comment filename and captures the sequence number. */
 const COMMENT_FILE_RE = /^(\d+)\.md$/;
-
-/**
- * Next sequential id of the form `t<N>` given the ids already present: max
- * numeric suffix + 1, or `t1` if none qualify. Ids that don't match `^t(\d+)$`
- * are simply ignored when computing the max — they can't collide with this
- * scheme.
- */
-export function newThreadId(existingIds: string[]): string {
-  let max = 0;
-  for (const id of existingIds) {
-    const m = ID_RE.exec(id);
-    if (m) max = Math.max(max, Number(m[1]));
-  }
-  return `t${max + 1}`;
-}
 
 /**
  * Natural id ordering: `t2` before `t10`. When both ids match `t<N>` we compare

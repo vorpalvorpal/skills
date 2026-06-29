@@ -9,4 +9,4 @@ A sentence with a :mark[commented span]{#t1} in it, plus <ins>an inserted span</
 
 ---
 
-<article data-thread="t1">t1 open. rjs: is this claim right? C: yes, see the source.</article>
+A closing paragraph below a thematic break.
