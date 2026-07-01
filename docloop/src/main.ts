@@ -22,7 +22,7 @@ import { DecorationSet } from '@milkdown/prose/view';
 import { createEditor, type DocloopEditor } from './editor';
 import { buildReadViewDecorations } from './decorations';
 import { decorationPlugin, decoPluginKey } from './deco-plugin';
-import { extractAnchors, nextThreadId, type Anchor } from './threads';
+import { extractAnchors, nextThreadId, threadNumber, type Anchor } from './threads';
 import {
   applyAnchor,
   removeAnchor,
@@ -36,7 +36,7 @@ import {
   resolveThread,
   type StoreThread,
 } from './threads-client';
-import { listContentHunks, acceptHunk, rejectHunk, type Hunk } from './hunks';
+import { listChanges, rejectChange, type Change } from './changes';
 import { OLD_MD, NEW_MD, SAMPLE_THREADS } from './sample';
 
 /** Mutable app state: the editor, the diff baseline, and the cached store. */
@@ -53,11 +53,14 @@ interface App {
   baselineIso: string | null;
   /** thread ids currently expanded; the rest are collapsed in the sidebar */
   expanded: Set<string>;
-  /** whether {@link initCollapse} has seeded `expanded` for the loaded turn yet */
+  /** expanded comment keys (`<threadId>#<seq>`); the rest are folded to a preview */
+  expandedComments: Set<string>;
+  /** change keys the user has accepted (marked reviewed) — hidden until commit */
+  acceptedChanges: Set<string>;
+  /** whether {@link initCollapse} has seeded the collapse state for this turn yet */
   collapseInitialized: boolean;
   els: {
     threads: HTMLElement;
-    changes: HTMLElement;
     addBtn: HTMLButtonElement;
   };
   /** thread id whose reply box should grab focus after the next render */
@@ -108,10 +111,9 @@ async function loadThreads(): Promise<{ threads: StoreThread[]; usingStore: bool
 async function main(): Promise<void> {
   const editorRoot = document.getElementById('editor');
   const threadList = document.getElementById('threads');
-  const changes = document.getElementById('changes');
   const addBtn = document.getElementById('add-comment') as HTMLButtonElement | null;
-  if (!editorRoot || !threadList || !changes || !addBtn) {
-    throw new Error('missing #editor / #threads / #changes / #add-comment');
+  if (!editorRoot || !threadList || !addBtn) {
+    throw new Error('missing #editor / #threads / #add-comment');
   }
 
   const { current, baseline, baselineIso } = await loadState();
@@ -130,8 +132,10 @@ async function main(): Promise<void> {
     commentEditors: [],
     baselineIso,
     expanded: new Set(),
+    expandedComments: new Set(),
+    acceptedChanges: new Set(),
     collapseInitialized: false,
-    els: { threads: threadList, changes, addBtn },
+    els: { threads: threadList, addBtn },
     focusReplyFor: null,
   };
 
@@ -180,6 +184,16 @@ async function main(): Promise<void> {
       }
     });
   }
+
+  // Clicking an in-text badge jumps to its thread and opens the reply box.
+  ed.view.dom.addEventListener('click', (e) => {
+    const badge = (e.target as HTMLElement).closest?.('.docloop-badge');
+    const id = badge?.getAttribute('data-thread');
+    if (id) {
+      e.preventDefault();
+      void focusThread(app, id);
+    }
+  });
 
   await rerender(app);
 
@@ -249,51 +263,59 @@ async function deleteThread(app: App, id: string): Promise<void> {
   }
 }
 
-/** Re-derive decorations + sidebar + changes panel from the current state. */
+/** Re-derive decorations + the margin gutter (comment + change cards). */
 async function rerender(app: App): Promise<void> {
   const { ed } = app;
-
-  // 1. Decorations: diff live doc vs the (mutable) baseline + anchor highlights.
   const baselineDoc = ed.parse(app.baselineMd);
   const liveDoc = ed.view.state.doc;
-  const set = buildReadViewDecorations(baselineDoc, liveDoc);
+
+  // Changes = grouped text-content diff vs the baseline. Accepted ones are hidden.
+  const changes = listChanges(baselineDoc, liveDoc);
+  const acceptedRanges = changes
+    .filter((c) => app.acceptedChanges.has(c.key))
+    .map((c) => [c.from, c.to] as const);
+
+  // 1. Decorations: diff (minus accepted spans) + anchor highlights.
+  const set = buildReadViewDecorations(baselineDoc, liveDoc, acceptedRanges);
   ed.view.dispatch(ed.view.state.tr.setMeta(decoPluginKey, set));
 
-  // 2. Sidebar (anchors joined with store comments) + 3. changes panel.
-  const md = currentMarkdown(ed);
-  await renderThreads(app, extractAnchors(md));
-  // Content edits only — opening/closing a thread is not an approvable change.
-  renderChanges(app, listContentHunks(app.baselineMd, md));
+  // 2. Rebuild the gutter: tear down old comment editors, then thread cards +
+  // change cards (the still-pending changes).
+  await Promise.all(app.commentEditors.map((e) => e.destroy()));
+  app.commentEditors = [];
+  app.els.threads.replaceChildren();
+  await renderThreads(app, extractAnchors(currentMarkdown(ed)));
+  renderChangeCards(app, changes.filter((c) => !app.acceptedChanges.has(c.key)));
 
-  // 4. Position the thread cards beside their anchors. renderThreads is awaited,
-  // so the cards (and their comment editors) are in the DOM and measurable now —
-  // lay out synchronously rather than racing a rAF against the async renders.
-  layoutThreadCards(app);
+  // 3. Position every card beside its anchor / change. renderThreads is awaited,
+  // so the DOM is measurable now — lay out synchronously rather than racing a rAF.
+  layoutGutter(app);
 }
 
 /** Pending rAF handle, so many layout triggers coalesce into one pass. */
 let layoutPending = 0;
 
-/** Re-position the thread cards on the next frame (after the DOM has settled). */
+/** Re-position the gutter cards on the next frame (after the DOM has settled). */
 function scheduleLayout(app: App): void {
   if (layoutPending) return;
   layoutPending = requestAnimationFrame(() => {
     layoutPending = 0;
-    layoutThreadCards(app);
+    layoutGutter(app);
   });
 }
 
 /**
- * Margin layout: place each thread card at its anchor's vertical position in the
- * doc, but never above the previous card — so cards stack downward and never
- * overlap (the one whose anchor is higher wins the spot; the next slides below
- * it). The Changes panel reserves the top, and the gutter is grown to the lowest
- * card so the page scrolls to reveal it. Re-run on every open/close/expand/resize.
+ * Margin layout: place every gutter card — comment threads AND change cards — at
+ * its target's vertical position in the doc, but never above the previous card, so
+ * cards stack downward and never overlap (the one whose target is higher wins the
+ * spot; the next slides below it). A thread's target is its anchor highlight; a
+ * change card's is its PM `from` position. The gutter is grown to the lowest card
+ * so the page scrolls to reveal it. Re-run on every open/close/expand/accept/resize.
  */
-function layoutThreadCards(app: App): void {
+function layoutGutter(app: App): void {
   const gutter = app.els.threads;
   const sidebar = gutter.closest('.sidebar') as HTMLElement | null;
-  const cards = Array.from(gutter.querySelectorAll<HTMLElement>('.thread'));
+  const cards = Array.from(gutter.querySelectorAll<HTMLElement>('.thread, .change-card'));
   if (!sidebar) return;
   if (cards.length === 0) {
     sidebar.style.minHeight = '';
@@ -303,24 +325,27 @@ function layoutThreadCards(app: App): void {
   const originTop = sidebar.getBoundingClientRect().top;
   const editorDom = app.ed.view.dom;
 
-  // Each card's desired top = its anchor's offset from the gutter origin.
-  const placed = cards
-    .map((card) => {
-      const id = card.dataset.thread ?? '';
-      const anchorEl =
+  const yOf = (card: HTMLElement): number => {
+    if (card.dataset.thread) {
+      const id = card.dataset.thread;
+      const el =
         editorDom.querySelector<HTMLElement>(`.docloop-mark[data-thread="${id}"]`) ??
         editorDom.querySelector<HTMLElement>(`.docloop-badge[data-thread="${id}"]`);
-      const y = anchorEl
-        ? anchorEl.getBoundingClientRect().top - originTop
-        : Number.POSITIVE_INFINITY;
-      return { card, y };
-    })
-    .sort((a, b) => a.y - b.y);
+      return el ? el.getBoundingClientRect().top - originTop : Number.POSITIVE_INFINITY;
+    }
+    // change card: locate by its live-doc PM position.
+    const from = Number(card.dataset.from);
+    try {
+      return app.ed.view.coordsAtPos(from).top - originTop;
+    } catch {
+      return Number.POSITIVE_INFINITY;
+    }
+  };
+
+  const placed = cards.map((card) => ({ card, y: yOf(card) })).sort((a, b) => a.y - b.y);
 
   const GAP = 8;
-  // Reserve the space behind the Changes panel so a top card isn't hidden by it.
-  const changesPanel = sidebar.querySelector<HTMLElement>('.changes-panel');
-  let cursor = changesPanel ? changesPanel.offsetHeight + GAP : 0;
+  let cursor = 0;
   for (const { card, y } of placed) {
     const top = Math.max(Number.isFinite(y) ? y : cursor, cursor);
     card.style.top = `${top}px`;
@@ -330,25 +355,45 @@ function layoutThreadCards(app: App): void {
 }
 
 /**
- * Seed the collapse state for the just-loaded turn: every thread starts collapsed
- * EXCEPT those that changed on the last turn — opened (anchor new vs the baseline
- * doc) or updated (a comment created after the previous commit, `baselineIso`).
- * Runs once per loaded turn; user toggles and later mutations are preserved
- * because rerender doesn't re-seed (the Reload handler clears the flag).
+ * Seed the collapse state for the just-loaded turn:
+ *   - a **comment** starts open iff it is new this turn (created after the previous
+ *     commit, `baselineIso`); every other comment folds to a one-line preview;
+ *   - a **thread** starts open iff it was opened this turn (anchor new vs the
+ *     baseline doc) or holds a new comment; otherwise it's collapsed to declutter.
+ * Runs once per loaded turn; user toggles and later mutations are preserved because
+ * rerender doesn't re-seed (the Reload handler clears the flag).
  */
 function initCollapse(app: App, anchors: Anchor[]): void {
   app.expanded = new Set();
+  app.expandedComments = new Set();
   const sinceMs = app.baselineIso ? Date.parse(app.baselineIso) : NaN;
+  const isNew = (c: { created: string }) =>
+    !Number.isNaN(sinceMs) && Date.parse(c.created) > sinceMs;
   const prevIds = new Set(extractAnchors(app.baselineMd).map((a) => a.id));
   const commentsById = new Map(app.threads.map((t) => [t.id, t.comments]));
   for (const a of anchors) {
+    const comments = commentsById.get(a.id) ?? [];
+    for (const c of comments) if (isNew(c)) app.expandedComments.add(`${a.id}#${c.seq}`);
     const opened = !prevIds.has(a.id);
-    const updated = (commentsById.get(a.id) ?? []).some(
-      (c) => !Number.isNaN(sinceMs) && Date.parse(c.created) > sinceMs,
-    );
-    if (opened || updated) app.expanded.add(a.id);
+    if (opened || comments.some(isNew)) app.expanded.add(a.id);
   }
   app.collapseInitialized = true;
+}
+
+/**
+ * Focus a thread from an in-text badge click: open the thread, unfold its most
+ * recent comment (the one you'd be replying to), focus the reply box, and scroll
+ * the card into view.
+ */
+async function focusThread(app: App, id: string): Promise<void> {
+  app.expanded.add(id);
+  const comments = app.threads.find((t) => t.id === id)?.comments ?? [];
+  if (comments.length) app.expandedComments.add(`${id}#${comments[comments.length - 1].seq}`);
+  app.focusReplyFor = id;
+  await rerender(app);
+  app.els.threads
+    .querySelector(`.thread[data-thread="${id}"]`)
+    ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
 /** Render one comment body as a read-only Milkdown instance inside `host`. */
@@ -365,20 +410,9 @@ async function renderComment(app: App, host: HTMLElement, body: string): Promise
  * Milkdown), a reply box, and a Resolve button.
  */
 async function renderThreads(app: App, anchors: Anchor[]): Promise<void> {
-  // Tear down the previous render's comment editors before rebuilding.
-  await Promise.all(app.commentEditors.map((e) => e.destroy()));
-  app.commentEditors = [];
-
+  // The gutter is cleared and comment editors torn down by the caller (rerender).
   const host = app.els.threads;
-  host.replaceChildren();
-
-  if (anchors.length === 0) {
-    const empty = document.createElement('li');
-    empty.className = 'muted';
-    empty.textContent = 'No comment threads.';
-    host.appendChild(empty);
-    return;
-  }
+  if (anchors.length === 0) return;
 
   // First render of a loaded turn: decide which threads start expanded.
   if (!app.collapseInitialized) initCollapse(app, anchors);
@@ -404,7 +438,7 @@ async function renderThreads(app: App, anchors: Anchor[]): Promise<void> {
 
     const badge = document.createElement('span');
     badge.className = 'thread-badge';
-    badge.textContent = String(i + 1);
+    badge.textContent = threadNumber(a.id); // same source as the in-text badge
     head.appendChild(badge);
 
     const anchorEl = document.createElement('span');
@@ -452,14 +486,43 @@ async function renderThreads(app: App, anchors: Anchor[]): Promise<void> {
       bodyHost.appendChild(none);
     } else {
       for (const c of comments) {
+        const key = `${a.id}#${c.seq}`;
+        const cCollapsed = !app.expandedComments.has(key);
         const item = document.createElement('div');
-        item.className = 'comment';
+        item.className = cCollapsed ? 'comment collapsed' : 'comment';
+        bodyHost.appendChild(item);
+
+        // Comment header: caret + author + a one-line preview (shown collapsed).
+        const cHead = document.createElement('div');
+        cHead.className = 'comment-head';
+        cHead.title = 'Click to expand / collapse this comment';
+        const cCaret = document.createElement('span');
+        cCaret.className = 'comment-caret';
+        cCaret.textContent = cCollapsed ? '▸' : '▾';
+        cHead.appendChild(cCaret);
         const meta = document.createElement('span');
         meta.className = 'comment-meta';
         meta.textContent = c.author;
-        item.appendChild(meta);
-        bodyHost.appendChild(item);
-        await renderComment(app, item, c.body);
+        cHead.appendChild(meta);
+        const preview = document.createElement('span');
+        preview.className = 'comment-preview';
+        preview.textContent = c.body.replace(/\s+/g, ' ').trim().slice(0, 80);
+        cHead.appendChild(preview);
+        item.appendChild(cHead);
+
+        // Comment body (read-only Milkdown), hidden while the comment is folded.
+        const cBody = document.createElement('div');
+        cBody.className = 'comment-body-host';
+        item.appendChild(cBody);
+        await renderComment(app, cBody, c.body);
+
+        cHead.addEventListener('click', () => {
+          const nc = item.classList.toggle('collapsed');
+          cCaret.textContent = nc ? '▸' : '▾';
+          if (nc) app.expandedComments.delete(key);
+          else app.expandedComments.add(key);
+          scheduleLayout(app); // height changed → restack the gutter
+        });
       }
     }
 
@@ -495,54 +558,58 @@ async function renderThreads(app: App, anchors: Anchor[]): Promise<void> {
   app.focusReplyFor = null;
 }
 
-/** Render the per-hunk Accept / Reject controls. */
-function renderChanges(app: App, hunks: Hunk[]): void {
-  const host = app.els.changes;
-  host.replaceChildren();
-
-  if (hunks.length === 0) {
-    const empty = document.createElement('li');
-    empty.className = 'muted';
-    empty.textContent = 'No pending changes.';
-    host.appendChild(empty);
-    return;
-  }
-
-  hunks.forEach((h) => {
+/**
+ * Render a change card per pending change, into the margin gutter (positioned by
+ * layoutGutter beside the change). Accept marks it reviewed (hidden until commit);
+ * Reject reverts the span in the live doc.
+ */
+function renderChangeCards(app: App, changes: Change[]): void {
+  const host = app.els.threads;
+  for (const c of changes) {
     const li = document.createElement('li');
-    li.className = `change change-${h.type}`;
+    li.className = `change-card change-${c.type}`;
+    li.dataset.from = String(c.from);
 
-    const label = document.createElement('span');
+    const label = document.createElement('div');
     label.className = 'change-label';
-    const verb = h.type === 'insert' ? '+ ' : '− ';
-    label.textContent = verb + h.value.trim();
+    if (c.type === 'insert') {
+      label.textContent = `+ ${c.newValue.trim()}`;
+    } else if (c.type === 'delete') {
+      label.textContent = `− ${c.oldValue.trim()}`;
+    } else {
+      const del = document.createElement('span');
+      del.className = 'change-del-text';
+      del.textContent = c.oldValue.trim();
+      const ins = document.createElement('span');
+      ins.className = 'change-ins-text';
+      ins.textContent = c.newValue.trim();
+      label.append(del, document.createTextNode(' → '), ins);
+    }
     li.appendChild(label);
 
+    const controls = document.createElement('div');
+    controls.className = 'change-controls';
     const accept = document.createElement('button');
     accept.className = 'btn btn-accept';
     accept.textContent = 'Accept';
-    accept.title = 'Keep this change (advance the baseline)';
+    accept.title = 'Mark reviewed — keep this change (hidden until you commit)';
     accept.addEventListener('click', () => {
-      // Accept advances the baseline; the live doc is unchanged.
-      app.baselineMd = acceptHunk(app.baselineMd, currentMarkdown(app.ed), h.index);
+      app.acceptedChanges.add(c.key);
       void rerender(app);
     });
-    li.appendChild(accept);
-
     const reject = document.createElement('button');
     reject.className = 'btn btn-reject';
     reject.textContent = 'Reject';
     reject.title = 'Revert this change in the document';
     reject.addEventListener('click', () => {
-      // Reject rewrites the live doc back to the baseline for this span.
-      const reverted = rejectHunk(app.baselineMd, currentMarkdown(app.ed), h.index);
-      loadMarkdown(app.ed, reverted);
+      rejectChange(app.ed.view, c);
       void rerender(app);
     });
-    li.appendChild(reject);
+    controls.append(accept, reject);
+    li.appendChild(controls);
 
     host.appendChild(li);
-  });
+  }
 }
 
 main().catch((err) => {

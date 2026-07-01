@@ -59,6 +59,10 @@ body {
   padding: 0.6rem 1rem;
   border-bottom: 1px solid var(--rule);
   font-size: 0.9rem;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--bg);
 }
 .topbar .muted { color: var(--muted); }
 .topbar .legend { margin-left: auto; display: flex; gap: 0.4rem; }
@@ -159,20 +163,6 @@ body {
   padding-left: 1.25rem;
   position: relative; /* positioning origin for the absolute thread cards */
 }
-.sidebar h2 {
-  font-size: 0.8rem;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--muted);
-  margin: 0 0 0.75rem;
-}
-/* Changes stays in normal flow at the top, above the thread gutter. */
-.changes-panel {
-  position: relative;
-  z-index: 2;
-  background: var(--bg);
-  padding-bottom: 0.5rem;
-}
 /* The gutter spans the doc height; cards are positioned by JS at their anchor. */
 .threads {
   list-style: none;
@@ -240,6 +230,30 @@ body {
 .thread-orphan { color: var(--del-fg); }
 .muted { color: var(--muted); }
 
+/* --- individual comments (collapsible) --- */
+.comment { border-top: 1px solid var(--rule); padding: 0.3rem 0; }
+.comment:first-child { border-top: none; }
+.comment-head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.3rem;
+  cursor: pointer;
+  user-select: none;
+}
+.comment-caret { color: var(--muted); font-size: 0.6rem; width: 0.7rem; flex: none; }
+.comment-meta { font-weight: 600; font-size: 0.72rem; color: var(--muted); flex: none; }
+.comment-preview {
+  color: var(--muted);
+  font-size: 0.75rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* Expanded: show the body, drop the redundant preview. */
+.comment:not(.collapsed) .comment-preview { display: none; }
+.comment.collapsed .comment-body-host { display: none; }
+.comment-body-host { margin-left: 1rem; }
+
 /* --- buttons --- */
 .btn {
   font: inherit;
@@ -276,24 +290,26 @@ body {
   color: var(--fg);
 }
 
-/* --- changes panel --- */
-.changes { list-style: none; margin: 0 0 1.25rem; padding: 0; }
-.change {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
+/* --- change-approval cards (in the margin gutter, beside the change) --- */
+.change-card {
+  position: absolute;
+  left: 0;
+  right: 0;
   border: 1px solid var(--rule);
+  border-left: 3px solid var(--rule);
   border-radius: 8px;
-  padding: 0.4rem 0.55rem;
-  margin-bottom: 0.45rem;
+  padding: 0.45rem 0.6rem;
   font-size: 0.8rem;
   background: var(--panel);
+  transition: top 0.12s ease;
 }
-.change-label {
-  flex: 1;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
+.change-card.change-insert { border-left-color: var(--ins-fg); }
+.change-card.change-delete { border-left-color: var(--del-fg); }
+.change-card.change-replace { border-left-color: var(--accent); }
+.change-label { word-break: break-word; }
 .change-insert .change-label { color: var(--ins-fg); }
 .change-delete .change-label { color: var(--del-fg); text-decoration: line-through; }
+/* replace: old (struck, red) → new (green) */
+.change-del-text { color: var(--del-fg); text-decoration: line-through; }
+.change-ins-text { color: var(--ins-fg); }
+.change-controls { display: flex; gap: 0.35rem; margin-top: 0.4rem; }

@@ -8,7 +8,6 @@ import {
   loadMarkdown,
   hasTextSelection,
 } from '../src/write-actions';
-import { acceptHunk, rejectHunk, listContentHunks } from '../src/hunks';
 import { findMarkHighlights } from '../src/decorations';
 import { OLD_MD, NEW_MD } from '../src/sample';
 
@@ -76,26 +75,4 @@ describe('write actions (document side)', () => {
     expect(findMarkHighlights(ed.view.state.doc).length).toBe(0);
   });
 
-  it('Reject hunk: reverts the inserted word in the live doc, anchors intact', async () => {
-    ed = await createEditor(document.createElement('div'), NEW_MD, { editable: true });
-    // baseline OLD_MD vs live NEW_MD: insert "brown" (hunk 0), delete "lazy" (hunk 1)
-    const md0 = currentMarkdown(ed);
-    const insHunk = listContentHunks(OLD_MD, md0).find((h) => h.type === 'insert')!;
-    const reverted = rejectHunk(OLD_MD, md0, insHunk.index);
-    loadMarkdown(ed, reverted);
-    expect(currentMarkdown(ed)).not.toContain('brown'); // insertion reverted
-    expect(currentMarkdown(ed)).toContain(':mark[questionable claim]{#t1}'); // anchor survives
-  });
-
-  it('Accept hunk: advances the baseline so it stops diffing, others remain', async () => {
-    ed = await createEditor(document.createElement('div'), NEW_MD, { editable: true });
-    const live = currentMarkdown(ed);
-    let baseline = OLD_MD;
-    const insHunk = listContentHunks(baseline, live).find((h) => h.type === 'insert')!;
-    baseline = acceptHunk(baseline, live, insHunk.index);
-    const remaining = listContentHunks(baseline, live);
-    expect(remaining.some((h) => h.type === 'insert')).toBe(false);
-    expect(remaining.some((h) => h.type === 'delete')).toBe(true);
-    expect(currentMarkdown(ed)).toBe(live); // live doc unchanged by accept
-  });
 });

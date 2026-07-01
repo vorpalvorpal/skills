@@ -11,6 +11,7 @@
 import type { Node as PMNode } from '@milkdown/prose/model';
 import { Decoration, DecorationSet } from '@milkdown/prose/view';
 import { computeDiff } from './diff';
+import { threadNumber } from './threads';
 
 /**
  * A flat view of a doc's text: the concatenated text content of every text node,
@@ -79,12 +80,23 @@ export function buildDiffDecorations(
   return DecorationSet.create(newDoc, diffDecorationList(oldDoc, newDoc));
 }
 
-/** The diff decorations as a flat list (so they can be merged with others). */
-export function diffDecorationList(oldDoc: PMNode, newDoc: PMNode): Decoration[] {
+/**
+ * The diff decorations as a flat list (so they can be merged with others). The
+ * decorations stay word-level (fine-grained) even though the accept/reject cards
+ * are coarser; `acceptedRanges` are PM `[from,to]` spans of changes the user has
+ * accepted (marked reviewed) — segments inside them are hidden so the doc reads
+ * clean once a change is approved.
+ */
+export function diffDecorationList(
+  oldDoc: PMNode,
+  newDoc: PMNode,
+  acceptedRanges: ReadonlyArray<readonly [number, number]> = [],
+): Decoration[] {
   const newIdx = buildBodyTextIndex(newDoc);
   const oldText = buildBodyTextIndex(oldDoc).text;
 
   const segs = computeDiff(oldText, newIdx.text);
+  const accepted = (pos: number) => acceptedRanges.some(([a, b]) => pos >= a && pos <= b);
 
   const decos: Decoration[] = [];
   let cursor = 0; // offset into newIdx.text
@@ -94,27 +106,21 @@ export function diffDecorationList(oldDoc: PMNode, newDoc: PMNode): Decoration[]
     } else if (seg.type === 'insert') {
       const from = newIdx.posAt(cursor);
       const to = newIdx.posAt(cursor + seg.value.length);
-      // Inline decoration over the inserted span. One Decoration per insert
-      // segment; diffWords groups a run of inserted words into a single segment,
-      // so N inserted *words* between two equal runs yield 1 segment / 1 deco.
-      // attrs (1st obj) set the DOM class; spec (2nd obj) carries a stable key so
-      // callers can identify inserts without reaching into PM internals.
-      decos.push(
-        Decoration.inline(from, to, { class: 'docloop-ins' }, { key: `ins-${cursor}` }),
-      );
+      if (!accepted(from)) {
+        decos.push(
+          Decoration.inline(from, to, { class: 'docloop-ins' }, { key: `ins-${cursor}` }),
+        );
+      }
       cursor += seg.value.length;
     } else {
       // delete: text is absent from the new doc, so it has no span here. Anchor
       // a widget at the current cursor position showing the removed words.
       const at = newIdx.posAt(cursor);
-      decos.push(
-        Decoration.widget(at, makeDeleteWidget(seg.value), {
-          // side > 0 so the widget sits after content already at `at`, and a
-          // stable key so the set is comparable in tests.
-          side: 1,
-          key: `del-${cursor}`,
-        }),
-      );
+      if (!accepted(at)) {
+        decos.push(
+          Decoration.widget(at, makeDeleteWidget(seg.value), { side: 1, key: `del-${cursor}` }),
+        );
+      }
     }
   }
   return decos;
@@ -186,35 +192,40 @@ export function findMarkHighlights(doc: PMNode): MarkHighlight[] {
   return highlights;
 }
 
-/** The comment-anchor decorations: a highlight span + ONE badge at its end. */
+/** The comment-anchor decorations: highlight span(s) + ONE badge per thread. */
 export function markDecorationList(doc: PMNode): Decoration[] {
+  const highlights = findMarkHighlights(doc);
   const decos: Decoration[] = [];
-  for (const h of findMarkHighlights(doc)) {
-    // Highlight background over the whole span. When the span crosses inline
-    // formatting ProseMirror renders one wrapper per text run — that's fine for
-    // the background, but the badge must NOT repeat per run (the old `::after`
-    // bug), so it is a single widget below.
+
+  // Highlight background over every run. When a span crosses inline formatting
+  // ProseMirror renders one wrapper per text run — fine for the background.
+  for (const h of highlights) {
     decos.push(
       Decoration.inline(h.from, h.to, { class: 'docloop-mark', 'data-thread': h.id }),
     );
-    // A single badge widget at the END of the highlight, cross-linking to the
-    // sidebar thread (it also gives the margin layout a precise anchor point).
+  }
+
+  // ONE badge per thread id (not per run), at the END of its last run, numbered
+  // by the id via threadNumber so it always matches the sidebar. Cross-links to
+  // the thread and gives the margin layout a precise anchor point.
+  const lastTo = new Map<string, number>();
+  for (const h of highlights) lastTo.set(h.id, Math.max(lastTo.get(h.id) ?? 0, h.to));
+  for (const [id, to] of lastTo) {
     decos.push(
-      Decoration.widget(h.to, () => makeBadge(h.id, h.index), {
-        side: 1,
-        key: `mark-badge-${h.id}`,
-      }),
+      Decoration.widget(to, () => makeBadge(id), { side: 1, key: `mark-badge-${id}` }),
     );
   }
   return decos;
 }
 
 /** The little numbered pill that marks where a comment anchor ends. */
-function makeBadge(id: string, index: number): HTMLElement {
+function makeBadge(id: string): HTMLElement {
   const el = document.createElement('span');
   el.className = 'docloop-badge';
-  el.textContent = String(index);
+  el.textContent = threadNumber(id);
   el.setAttribute('data-thread', id);
+  el.setAttribute('role', 'button');
+  el.title = 'Go to comment';
   return el;
 }
 
@@ -228,9 +239,13 @@ export function buildMarkDecorations(doc: PMNode): DecorationSet {
  * to the editor. `newDoc` is the live (current-version) doc; `oldDoc` the
  * previous version it is diffed against.
  */
-export function buildReadViewDecorations(oldDoc: PMNode, newDoc: PMNode): DecorationSet {
+export function buildReadViewDecorations(
+  oldDoc: PMNode,
+  newDoc: PMNode,
+  acceptedRanges: ReadonlyArray<readonly [number, number]> = [],
+): DecorationSet {
   return DecorationSet.create(newDoc, [
-    ...diffDecorationList(oldDoc, newDoc),
+    ...diffDecorationList(oldDoc, newDoc, acceptedRanges),
     ...markDecorationList(newDoc),
   ]);
 }
