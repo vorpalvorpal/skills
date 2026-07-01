@@ -80,12 +80,23 @@ export function buildDiffDecorations(
   return DecorationSet.create(newDoc, diffDecorationList(oldDoc, newDoc));
 }
 
-/** The diff decorations as a flat list (so they can be merged with others). */
-export function diffDecorationList(oldDoc: PMNode, newDoc: PMNode): Decoration[] {
+/**
+ * The diff decorations as a flat list (so they can be merged with others). The
+ * decorations stay word-level (fine-grained) even though the accept/reject cards
+ * are coarser; `acceptedRanges` are PM `[from,to]` spans of changes the user has
+ * accepted (marked reviewed) — segments inside them are hidden so the doc reads
+ * clean once a change is approved.
+ */
+export function diffDecorationList(
+  oldDoc: PMNode,
+  newDoc: PMNode,
+  acceptedRanges: ReadonlyArray<readonly [number, number]> = [],
+): Decoration[] {
   const newIdx = buildBodyTextIndex(newDoc);
   const oldText = buildBodyTextIndex(oldDoc).text;
 
   const segs = computeDiff(oldText, newIdx.text);
+  const accepted = (pos: number) => acceptedRanges.some(([a, b]) => pos >= a && pos <= b);
 
   const decos: Decoration[] = [];
   let cursor = 0; // offset into newIdx.text
@@ -95,27 +106,21 @@ export function diffDecorationList(oldDoc: PMNode, newDoc: PMNode): Decoration[]
     } else if (seg.type === 'insert') {
       const from = newIdx.posAt(cursor);
       const to = newIdx.posAt(cursor + seg.value.length);
-      // Inline decoration over the inserted span. One Decoration per insert
-      // segment; diffWords groups a run of inserted words into a single segment,
-      // so N inserted *words* between two equal runs yield 1 segment / 1 deco.
-      // attrs (1st obj) set the DOM class; spec (2nd obj) carries a stable key so
-      // callers can identify inserts without reaching into PM internals.
-      decos.push(
-        Decoration.inline(from, to, { class: 'docloop-ins' }, { key: `ins-${cursor}` }),
-      );
+      if (!accepted(from)) {
+        decos.push(
+          Decoration.inline(from, to, { class: 'docloop-ins' }, { key: `ins-${cursor}` }),
+        );
+      }
       cursor += seg.value.length;
     } else {
       // delete: text is absent from the new doc, so it has no span here. Anchor
       // a widget at the current cursor position showing the removed words.
       const at = newIdx.posAt(cursor);
-      decos.push(
-        Decoration.widget(at, makeDeleteWidget(seg.value), {
-          // side > 0 so the widget sits after content already at `at`, and a
-          // stable key so the set is comparable in tests.
-          side: 1,
-          key: `del-${cursor}`,
-        }),
-      );
+      if (!accepted(at)) {
+        decos.push(
+          Decoration.widget(at, makeDeleteWidget(seg.value), { side: 1, key: `del-${cursor}` }),
+        );
+      }
     }
   }
   return decos;
@@ -234,9 +239,13 @@ export function buildMarkDecorations(doc: PMNode): DecorationSet {
  * to the editor. `newDoc` is the live (current-version) doc; `oldDoc` the
  * previous version it is diffed against.
  */
-export function buildReadViewDecorations(oldDoc: PMNode, newDoc: PMNode): DecorationSet {
+export function buildReadViewDecorations(
+  oldDoc: PMNode,
+  newDoc: PMNode,
+  acceptedRanges: ReadonlyArray<readonly [number, number]> = [],
+): DecorationSet {
   return DecorationSet.create(newDoc, [
-    ...diffDecorationList(oldDoc, newDoc),
+    ...diffDecorationList(oldDoc, newDoc, acceptedRanges),
     ...markDecorationList(newDoc),
   ]);
 }

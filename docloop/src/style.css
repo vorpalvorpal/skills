@@ -163,20 +163,6 @@ body {
   padding-left: 1.25rem;
   position: relative; /* positioning origin for the absolute thread cards */
 }
-.sidebar h2 {
-  font-size: 0.8rem;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--muted);
-  margin: 0 0 0.75rem;
-}
-/* Changes stays in normal flow at the top, above the thread gutter. */
-.changes-panel {
-  position: relative;
-  z-index: 2;
-  background: var(--bg);
-  padding-bottom: 0.5rem;
-}
 /* The gutter spans the doc height; cards are positioned by JS at their anchor. */
 .threads {
   list-style: none;
@@ -304,27 +290,26 @@ body {
   color: var(--fg);
 }
 
-/* --- changes panel --- */
-.changes { list-style: none; margin: 0 0 1.25rem; padding: 0; }
-.change {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
+/* --- change-approval cards (in the margin gutter, beside the change) --- */
+.change-card {
+  position: absolute;
+  left: 0;
+  right: 0;
   border: 1px solid var(--rule);
+  border-left: 3px solid var(--rule);
   border-radius: 8px;
-  padding: 0.4rem 0.55rem;
-  margin-bottom: 0.45rem;
+  padding: 0.45rem 0.6rem;
   font-size: 0.8rem;
   background: var(--panel);
+  transition: top 0.12s ease;
 }
-.change-label {
-  flex: 1;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
+.change-card.change-insert { border-left-color: var(--ins-fg); }
+.change-card.change-delete { border-left-color: var(--del-fg); }
+.change-card.change-replace { border-left-color: var(--accent); }
+.change-label { word-break: break-word; }
 .change-insert .change-label { color: var(--ins-fg); }
 .change-delete .change-label { color: var(--del-fg); text-decoration: line-through; }
 /* replace: old (struck, red) → new (green) */
 .change-del-text { color: var(--del-fg); text-decoration: line-through; }
 .change-ins-text { color: var(--ins-fg); }
+.change-controls { display: flex; gap: 0.35rem; margin-top: 0.4rem; }
