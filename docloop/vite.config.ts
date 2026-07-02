@@ -27,7 +27,12 @@ const run = promisify(execFile);
  */
 function docloopEndpoints(): Plugin {
   const workspace = join(process.cwd(), 'workspace');
-  const docPath = join(workspace, 'doc.md');
+  // The tracked doc under review. Defaults to `doc.md`; set DOCLOOP_DOC to point
+  // the loop at any markdown file in the workspace (e.g. DOCLOOP_DOC=design.md),
+  // so one workspace can host a doc per move. turn.xml + threads/ are shared, so
+  // run one active doc per server instance.
+  const docName = process.env.DOCLOOP_DOC ?? 'doc.md';
+  const docPath = join(workspace, docName);
   const turnPath = join(workspace, 'turn.xml');
   const threadsDir = join(workspace, 'threads'); // sidecar store: threads/<id>/NNNN.md
   const git = (...args: string[]) => run('git', ['-C', workspace, ...args]);
@@ -52,9 +57,9 @@ function docloopEndpoints(): Plugin {
     }
   };
 
-  /** A committed revision of doc.md, or null if that rev doesn't exist. */
+  /** A committed revision of the doc, or null if that rev doesn't exist. */
   const showDoc = async (rev: string): Promise<string | null> => {
-    return git('show', `${rev}:doc.md`)
+    return git('show', `${rev}:${docName}`)
       .then(({ stdout }) => stdout)
       .catch(() => null);
   };
@@ -71,6 +76,8 @@ function docloopEndpoints(): Plugin {
     name: 'docloop-endpoints',
     apply: 'serve', // dev server only — never part of the build or tests
     configureServer(server) {
+      // eslint-disable-next-line no-console
+      console.log(`[docloop] serving workspace/${docName}`);
       const send = (res: import('node:http').ServerResponse, status: number, payload: unknown) => {
         res.statusCode = status;
         res.setHeader('content-type', 'application/json');
@@ -106,7 +113,7 @@ function docloopEndpoints(): Plugin {
             // touches threads (e.g. a reply, no doc edit) still advances HEAD —
             // otherwise the previous-commit time wouldn't move and that reply
             // would be re-reported as "updated" on the next turn.
-            await git('add', 'doc.md', 'threads');
+            await git('add', docName, 'threads');
             let committed = true;
             await git('commit', '-q', '-m', `turn @ ${new Date().toISOString()}`).catch(() => {
               committed = false; // nothing staged — no change since the last commit
@@ -119,15 +126,39 @@ function docloopEndpoints(): Plugin {
         })();
       });
 
+      // POST /save-draft — write doc.md to the workspace working tree WITHOUT
+      // committing (no git add/commit, no turn.xml render). Lets the human save
+      // progress across several sessions before one real "Hand to Claude" turn.
+      // GET /doc's `current` always reads this working-tree file (see below), so
+      // a saved draft reloads correctly and diffs against the same HEAD~1
+      // baseline a live in-browser edit already would. Comment replies/resolves
+      // are unaffected by any of this — they persist immediately via /threads.
+      server.middlewares.use('/save-draft', (req, res, next) => {
+        if (req.method !== 'POST') return next();
+        void (async () => {
+          try {
+            await ensureRepo();
+            const md = await readBody(req);
+            await writeFile(docPath, md, 'utf8');
+            send(res, 200, { ok: true });
+          } catch (err) {
+            send(res, 500, { ok: false, error: String(err) });
+          }
+        })();
+      });
+
       // GET /doc — current + baseline from git, for (re)loading the read/write view.
       server.middlewares.use('/doc', (req, res, next) => {
         if (req.method !== 'GET') return next();
         void (async () => {
           try {
             await ensureRepo();
-            // current: HEAD's doc.md if any commit exists, else the working file.
+            // current: the working-tree file if one exists — after every commit
+            // (via /commit, or Claude committing directly) it matches HEAD, but a
+            // /save-draft may have left it ahead of HEAD (an uncommitted draft) —
+            // else HEAD's committed doc.md, else absent entirely (no doc yet).
             const current =
-              (await showDoc('HEAD')) ?? (await readFile(docPath, 'utf8').catch(() => null));
+              (await readFile(docPath, 'utf8').catch(() => null)) ?? (await showDoc('HEAD'));
             if (current === null) return send(res, 200, { ok: true, present: false });
             // baseline: the commit before HEAD (null if HEAD is the first commit).
             const baseline = await showDoc('HEAD~1');
